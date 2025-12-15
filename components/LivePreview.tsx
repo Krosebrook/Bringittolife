@@ -272,7 +272,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
                          <iframe
                             ref={iframeRef}
                             title="Gemini Live Preview"
-                            aria-label="Interactive application preview"
+                            aria-label="Interactive preview of the generated application"
                             srcDoc={creation.html + INTERACTIVE_STYLES + DRAG_SCRIPT}
                             className="w-full h-full"
                             sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"

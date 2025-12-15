@@ -1,0 +1,14 @@
+/* Technical Dot Grid Background */
+.bg-dot-grid {
+  background-size: 40px 40px;
+  background-image: radial-gradient(circle, #3f3f46 1px, transparent 1px);
+}
+
+/* Custom Scrollbar Hiding */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}

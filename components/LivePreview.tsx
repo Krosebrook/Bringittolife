@@ -5,11 +5,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Creation } from '../types';
 import { PdfRenderer } from './PdfRenderer';
-import { INTERACTIVE_STYLES, DRAG_SCRIPT } from '../utils/injection';
+import { INTERACTIVE_STYLES, DRAG_SCRIPT, SUBTLE_BACKGROUND_STYLE } from '../utils/injection';
 import { usePanZoom } from '../hooks/usePanZoom';
 import { PreviewToolbar, DeviceMode } from './PreviewToolbar';
 import { downloadArtifact, downloadFile } from '../utils/fileHelpers';
 import { convertToReactComponent } from '../utils/reactConverter';
+import { LoadingStep } from './ui/LoadingStep';
 
 interface LivePreviewProps {
   creation: Creation | null;
@@ -17,21 +18,6 @@ interface LivePreviewProps {
   isFocused: boolean;
   onReset: () => void;
 }
-
-const LoadingStep = ({ text, active, completed }: { text: string, active: boolean, completed: boolean }) => (
-    <div className={`flex items-center space-x-3 transition-all duration-500 ${active || completed ? 'opacity-100 translate-x-0' : 'opacity-30 translate-x-4'}`}>
-        <div className={`w-4 h-4 flex items-center justify-center ${completed ? 'text-green-400' : active ? 'text-blue-400' : 'text-zinc-700'}`}>
-            {completed ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            ) : active ? (
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-            ) : (
-                <div className="w-1.5 h-1.5 bg-zinc-700 rounded-full"></div>
-            )}
-        </div>
-        <span className={`font-mono text-xs tracking-wide uppercase ${active ? 'text-zinc-200' : completed ? 'text-zinc-400 line-through' : 'text-zinc-600'}`}>{text}</span>
-    </div>
-);
 
 export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, isFocused, onReset }) => {
     const [loadingStep, setLoadingStep] = useState(0);
@@ -273,7 +259,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
                             ref={iframeRef}
                             title="Gemini Live Preview"
                             aria-label="Interactive preview of the generated application"
-                            srcDoc={creation.html + INTERACTIVE_STYLES + DRAG_SCRIPT}
+                            srcDoc={creation.html + SUBTLE_BACKGROUND_STYLE + INTERACTIVE_STYLES + DRAG_SCRIPT}
                             className="w-full h-full"
                             sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
                             onLoad={handleIframeLoad}

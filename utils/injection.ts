@@ -3,6 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export const SUBTLE_BACKGROUND_STYLE = `
+<style>
+  /* Injected background for better aesthetics - using :where(body) to keep specificity low (0) so user styles can override */
+  :where(body) {
+    background: linear-gradient(300deg, #f8fafc, #eff6ff, #f0fdf4);
+    background-size: 200% 200%;
+    animation: gradient-animation 15s ease infinite;
+    min-height: 100vh;
+    margin: 0;
+  }
+
+  @keyframes gradient-animation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+</style>
+`;
+
 export const INTERACTIVE_STYLES = `
 <style>
   /* Injected by LivePreview to enhance interactivity */

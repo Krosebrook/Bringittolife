@@ -2,100 +2,29 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Hero } from './components/Hero';
 import { InputArea } from './components/InputArea';
 import { LivePreview } from './components/LivePreview';
 import { CreationHistory } from './components/CreationHistory';
-import { bringToLife, generateImage } from './services/gemini';
 import { ArrowUpTrayIcon } from '@heroicons/react/24/solid';
 import { useHistory } from './hooks/useHistory';
 import { Creation } from './types';
 import { Tooltip } from './components/ui/Tooltip';
-import { fileToBase64 } from './utils/fileHelpers';
+import { useCreation } from './hooks/useCreation';
 
 const App: React.FC = () => {
-  const [activeCreation, setActiveCreation] = useState<Creation | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const { history, addCreation } = useHistory();
+  const { 
+    activeCreation, 
+    isGenerating, 
+    generateFromPrompt, 
+    generateFromText, 
+    reset, 
+    setActiveCreation 
+  } = useCreation(addCreation);
+  
   const importInputRef = useRef<HTMLInputElement>(null);
-
-  const handleGenerate = async (promptText: string, file?: File) => {
-    setIsGenerating(true);
-    // Clear active creation to show loading state
-    setActiveCreation(null);
-
-    try {
-      let imageBase64: string | undefined;
-      let mimeType: string | undefined;
-
-      if (file) {
-        imageBase64 = await fileToBase64(file);
-        mimeType = file.type.toLowerCase();
-      }
-
-      const html = await bringToLife(promptText, imageBase64, mimeType);
-      
-      if (html) {
-        const newCreation: Creation = {
-          id: crypto.randomUUID(),
-          name: file ? file.name : 'New Creation',
-          html: html,
-          // Store the full data URL for easy display
-          originalImage: imageBase64 && mimeType ? `data:${mimeType};base64,${imageBase64}` : undefined,
-          timestamp: new Date(),
-        };
-        setActiveCreation(newCreation);
-        addCreation(newCreation);
-      }
-
-    } catch (error) {
-      console.error("Failed to generate:", error);
-      alert("Something went wrong while bringing your file to life. Please try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleTextToImage = async (prompt: string) => {
-    setIsGenerating(true);
-    setActiveCreation(null);
-
-    try {
-        // 1. Generate Image from Text
-        const { base64, mimeType } = await generateImage(prompt);
-
-        // 2. Bring the generated image to life (App Generation)
-        // We pass the prompt as user context
-        const html = await bringToLife(prompt, base64, mimeType);
-
-        if (html) {
-            const newCreation: Creation = {
-                id: crypto.randomUUID(),
-                name: prompt.length > 30 ? prompt.substring(0, 30) + '...' : prompt,
-                html: html,
-                originalImage: `data:${mimeType};base64,${base64}`,
-                timestamp: new Date(),
-            };
-            setActiveCreation(newCreation);
-            addCreation(newCreation);
-        }
-    } catch (error) {
-        console.error("Failed to generate from text:", error);
-        alert("Failed to generate idea. Please try again.");
-    } finally {
-        setIsGenerating(false);
-    }
-  };
-
-  const handleReset = () => {
-    setActiveCreation(null);
-    setIsGenerating(false);
-  };
-
-  const handleSelectCreation = (creation: Creation) => {
-    setActiveCreation(creation);
-  };
 
   const handleImportClick = () => {
     importInputRef.current?.click();
@@ -161,8 +90,8 @@ const App: React.FC = () => {
           {/* 2. Input Section */}
           <div className="w-full flex justify-center mb-8">
               <InputArea 
-                onGenerate={handleGenerate} 
-                onTextToImage={handleTextToImage}
+                onGenerate={generateFromPrompt} 
+                onTextToImage={generateFromText}
                 isGenerating={isGenerating} 
                 disabled={isFocused} 
               />
@@ -173,7 +102,7 @@ const App: React.FC = () => {
         {/* 3. History Section & Footer - Stays at bottom */}
         <div className="flex-shrink-0 pb-6 w-full mt-auto flex flex-col items-center gap-6">
             <div className="w-full px-2 md:px-0">
-                <CreationHistory history={history} onSelect={handleSelectCreation} />
+                <CreationHistory history={history} onSelect={setActiveCreation} />
             </div>
             
             <a 
@@ -192,7 +121,7 @@ const App: React.FC = () => {
         creation={activeCreation}
         isLoading={isGenerating}
         isFocused={isFocused}
-        onReset={handleReset}
+        onReset={reset}
       />
 
       {/* Subtle Import Button (Bottom Right) */}

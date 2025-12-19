@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -5,13 +6,14 @@
 
 export const SUBTLE_BACKGROUND_STYLE = `
 <style>
-  /* Injected background for better aesthetics - using :where(body) to keep specificity low (0) so user styles can override */
+  /* Injected background for better aesthetics - using :where(body) to keep specificity low */
   :where(body) {
     background: linear-gradient(300deg, #f8fafc, #eff6ff, #f0fdf4);
     background-size: 200% 200%;
     animation: gradient-animation 15s ease infinite;
     min-height: 100vh;
     margin: 0;
+    scroll-behavior: smooth;
   }
 
   @keyframes gradient-animation {
@@ -24,77 +26,129 @@ export const SUBTLE_BACKGROUND_STYLE = `
 
 export const INTERACTIVE_STYLES = `
 <style>
-  /* Injected by LivePreview to enhance interactivity */
+  /* -------------------------------------------------- */
+  /* ENHANCED INTERACTIVE SYSTEM                        */
+  /* -------------------------------------------------- */
   
-  /* Base interactive element styles */
+  /* Smooth transitions for all potentially interactive elements */
   button, 
   a, 
-  input[type="submit"], 
-  input[type="button"], 
-  input[type="reset"],
-  [role="button"], 
+  input, 
+  select, 
+  textarea,
+  [role="button"],
+  .card,
+  section > div {
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  }
+
+  /* Magnetic & Lift Effect for Buttons */
+  button, 
   .btn, 
-  .button {
-    transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important; /* Material Standard Curve */
-    position: relative !important;
-    cursor: pointer !important;
-    will-change: transform, box-shadow, filter !important;
-    -webkit-tap-highlight-color: transparent !important;
+  .button,
+  [role="button"],
+  input[type="submit"] {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
   }
 
-  /* Hover state: Lift, scale, and brighten with a springy feel */
   button:hover, 
-  a:hover, 
-  input[type="submit"]:hover, 
-  input[type="button"]:hover, 
-  input[type="reset"]:hover,
-  [role="button"]:hover, 
   .btn:hover, 
-  .button:hover {
-    transform: translateY(-2px) scale(1.02) !important;
-    filter: brightness(1.1) saturate(1.1) !important;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-    z-index: 10 !important;
+  .button:hover,
+  [role="button"]:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.15);
+    filter: brightness(1.05);
   }
 
-  /* Active state: distinct press down effect */
   button:active, 
-  a:active, 
-  input[type="submit"]:active, 
-  input[type="button"]:active, 
-  input[type="reset"]:active,
-  [role="button"]:active, 
   .btn:active, 
   .button:active {
-    transform: translateY(1px) scale(0.98) !important;
-    filter: brightness(0.9) !important;
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06) !important;
-    transition-duration: 0.05s !important;
+    transform: translateY(1px) scale(0.98);
+    transition-duration: 0.1s !important;
   }
 
-  /* Focus visible: Clear accessibility ring */
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  [role="button"]:focus-visible,
-  .btn:focus-visible,
-  .button:focus-visible {
-    outline: 2px solid #3b82f6 !important;
-    outline-offset: 2px !important;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3) !important;
-    z-index: 20 !important;
+  /* Subtle Pulse for Icons inside buttons */
+  button svg, 
+  .btn svg,
+  a svg {
+    transition: transform 0.3s ease;
   }
 
-  /* Input focus states - Enhanced with lift */
-  input:not([type="button"]):not([type="submit"]):not([type="reset"]):focus, 
-  textarea:focus, 
-  select:focus {
-    border-color: #3b82f6 !important;
-    outline: none !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-    transform: translateY(-1px) !important;
-    transition: all 0.2s ease !important;
-    background-color: #ffffff !important;
+  button:hover svg, 
+  .btn:hover svg,
+  a:hover svg {
+    animation: subtle-pulse 2s infinite ease-in-out;
+  }
+
+  @keyframes subtle-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Reveal Animations for Sections */
+  main, section, article {
+    animation: reveal-up 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    opacity: 0;
+  }
+
+  section:nth-child(1) { animation-delay: 0.1s; }
+  section:nth-child(2) { animation-delay: 0.2s; }
+  section:nth-child(3) { animation-delay: 0.3s; }
+  section:nth-child(4) { animation-delay: 0.4s; }
+
+  @keyframes reveal-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Soft Glow for primary-looking elements */
+  .bg-blue-500:hover, 
+  .bg-indigo-600:hover,
+  button[class*="bg-"]:hover {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+
+  /* Interactive Links */
+  a {
+    position: relative;
+    text-decoration: none;
+  }
+  
+  a:not([class*="bg-"]):after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 1px;
+    bottom: -2px;
+    left: 0;
+    background-color: currentColor;
+    transition: width 0.3s ease;
+    opacity: 0.7;
+  }
+
+  a:not([class*="bg-"]):hover:after {
+    width: 100%;
+  }
+
+  /* Skeleton loading state shimmer for anything with .loading class */
+  .loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 </style>
 `;

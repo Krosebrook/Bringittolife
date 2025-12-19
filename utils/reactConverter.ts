@@ -1,154 +1,199 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * World-class HTML to React Component Transformer.
+ * Uses the browser's DOMParser to intelligently decompose flat HTML 
+ * into a modular, reusable React architecture.
+ */
+
+interface ComponentModule {
+  name: string;
+  jsx: string;
+}
+
+const ATTRIBUTE_MAP: Record<string, string> = {
+  'class': 'className',
+  'for': 'htmlFor',
+  'tabindex': 'tabIndex',
+  'autoplay': 'autoPlay',
+  'onclick': 'onClick',
+  'onchange': 'onChange',
+  'onsubmit': 'onSubmit',
+  'autocomplete': 'autoComplete',
+  'autofocus': 'autoFocus',
+  'readonly': 'readOnly',
+  'maxlength': 'maxLength',
+  'stroke-width': 'strokeWidth',
+  'stroke-linecap': 'strokeLinecap',
+  'stroke-linejoin': 'strokeLinejoin',
+  'fill-rule': 'fillRule',
+  'clip-rule': 'clipRule',
+  'viewbox': 'viewBox',
+};
+
 function toCamelCase(str: string) {
   return str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
-function parseStyleString(styleString: string) {
-  if (!styleString) return {};
-  return styleString.split(';').reduce((acc: any, rule) => {
-    const [key, value] = rule.split(':');
-    if (key && value) {
-      // React style properties are camelCase (e.g., backgroundColor)
-      acc[toCamelCase(key.trim())] = value.trim();
-    }
-    return acc;
-  }, {});
+function parseStyle(style: CSSStyleDeclaration): string {
+  if (!style || style.length === 0) return '';
+  const obj: Record<string, string> = {};
+  for (let i = 0; i < style.length; i++) {
+    const prop = style[i];
+    obj[toCamelCase(prop)] = style.getPropertyValue(prop);
+  }
+  return JSON.stringify(obj);
 }
 
-export function convertToReactComponent(html: string, name: string = 'GeneratedComponent'): string {
-  // 1. Extract CSS
-  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  let css = styleMatch ? styleMatch[1] : '';
-  
-  // Escape backticks in CSS to prevent template literal breakage
-  css = css.replace(/`/g, '\\`');
-
-  // 2. Extract JS
-  const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-  let js = scriptMatch ? scriptMatch[1] : '';
-  
-  // 3. Extract Body Content
-  let bodyContent = html;
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (bodyMatch) {
-    bodyContent = bodyMatch[1];
-  } else {
-      // Fallback: strip head/style/script tags to get body content
-      bodyContent = bodyContent.replace(/<head[^>]*>[\s\S]*?<\/head>/i, '');
-      bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/i, '');
-      bodyContent = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/i, '');
+function elementToJSX(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent || '';
+  }
+  if (node.nodeType === Node.COMMENT_NODE) {
+    return `{/* ${node.textContent} */}`;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return '';
   }
 
-  // 4. Transform HTML to JSX
-  let jsx = bodyContent;
+  const el = node as HTMLElement;
+  const tagName = el.tagName.toLowerCase();
+  
+  // Skip script and style tags as they are handled separately
+  if (tagName === 'script' || tagName === 'style') return '';
 
-  // React Attribute Mapping
-  const attributeMap: {[key: string]: string} = {
-    'class': 'className',
-    'for': 'htmlFor',
-    'tabindex': 'tabIndex',
-    'autoplay': 'autoPlay',
-    'allowfullscreen': 'allowFullScreen',
-    'autocomplete': 'autoComplete',
-    'autofocus': 'autoFocus',
-    'readonly': 'readOnly',
-    'maxlength': 'maxLength',
-    'cellspacing': 'cellSpacing',
-    'cellpadding': 'cellPadding',
-    'rowspan': 'rowSpan',
-    'colspan': 'colSpan',
-    'usemap': 'useMap',
-    'enctype': 'encType',
-    'frameborder': 'frameBorder',
-    'crossorigin': 'crossOrigin',
-    // SVG attributes
-    'stroke-width': 'strokeWidth',
-    'stroke-linecap': 'strokeLinecap',
-    'stroke-linejoin': 'strokeLinejoin',
-    'fill-rule': 'fillRule',
-    'clip-rule': 'clipRule',
-    'clip-path': 'clipPath',
-    'text-anchor': 'textAnchor',
-    'dominant-baseline': 'dominantBaseline'
-  };
-
-  // Replace attributes with regex to ensure we catch ' attribute="' patterns
-  Object.keys(attributeMap).forEach(key => {
-    // Look for space + key + ="
-    const regex = new RegExp(`\\s${key}="`, 'g');
-    jsx = jsx.replace(regex, ` ${attributeMap[key]}="`);
-  });
-
-  // Comments
-  jsx = jsx.replace(/<!--([\s\S]*?)-->/g, '{/*$1*/}');
-
-  // Self-closing tags
-  const voidTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
-  voidTags.forEach(tag => {
-      // Regex to find <tag ... > (not ending in />) and replace with <tag ... />
-      // We use a replacer function to check if it's already self-closing.
-      const regex = new RegExp(`<(${tag})\\b([^>]*)>`, 'gi');
-      jsx = jsx.replace(regex, (match, tagName, attrs) => {
-          if (attrs.trim().endsWith('/')) return match; // Already self-closing
-          return `<${tagName}${attrs} />`;
-      });
-  });
-
-  // Inline styles: style="..." -> style={{...}}
-  jsx = jsx.replace(/style="([^"]*)"/g, (match, styleStr) => {
-    try {
-        const styleObj = parseStyleString(styleStr);
-        return `style={${JSON.stringify(styleObj)}}`;
-    } catch (e) {
-        return match; 
+  const attributes: string[] = [];
+  
+  for (let i = 0; i < el.attributes.length; i++) {
+    const attr = el.attributes[i];
+    const name = ATTRIBUTE_MAP[attr.name.toLowerCase()] || attr.name;
+    
+    if (name === 'style') {
+      attributes.push(`${name}={${parseStyle(el.style)}}`);
+    } else if (name.startsWith('on')) {
+      // Event handlers are tricky to convert from string to React without state mapping.
+      // We keep them as data attributes for transparency or as a starting point.
+      attributes.push(`data-${name}="${attr.value}"`);
+    } else {
+      attributes.push(`${name}="${attr.value.replace(/"/g, '&quot;')}"`);
     }
+  }
+
+  const children = Array.from(el.childNodes)
+    .map(child => elementToJSX(child))
+    .join('');
+
+  const selfClosing = ['img', 'input', 'br', 'hr', 'meta', 'link'].includes(tagName);
+  
+  if (selfClosing) {
+    return `<${tagName} ${attributes.join(' ')} />`;
+  }
+  
+  return `<${tagName} ${attributes.join(' ')}>${children}</${tagName}>`;
+}
+
+export function convertToReactComponent(html: string, originalName: string = 'ManifestedApp'): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  
+  const safeName = originalName.replace(/[^a-zA-Z0-9]/g, '') || 'ManifestedApp';
+  
+  // 1. Extract Styles
+  const styles = Array.from(doc.querySelectorAll('style'))
+    .map(s => s.textContent)
+    .join('\n');
+
+  // 2. Extract Scripts
+  const scripts = Array.from(doc.querySelectorAll('script'))
+    .map(s => s.textContent)
+    .join('\n');
+
+  // 3. Decompose Body into Modular Sections
+  const body = doc.body;
+  const subComponents: ComponentModule[] = [];
+  
+  // Find major semantic containers to convert into sub-components
+  const containers = body.querySelectorAll('header, main, footer, section, nav, aside');
+  
+  // If we have semantic containers, use them. Otherwise, take top-level children.
+  const targets = containers.length > 0 
+    ? Array.from(containers).filter(c => c.parentElement === body)
+    : Array.from(body.children);
+
+  const mainJSXParts: string[] = [];
+
+  targets.forEach((el, index) => {
+    const tagName = el.tagName.toLowerCase();
+    const componentName = `${tagName.charAt(0).toUpperCase() + tagName.slice(1)}${index + 1}`;
+    const jsx = elementToJSX(el);
+    
+    subComponents.push({ name: componentName, jsx });
+    mainJSXParts.push(`<${componentName} />`);
   });
 
-  // Handle Input Interactivity: Change value to defaultValue for inputs to allow editing
-  // (Since we don't have controlled state logic in the export)
-  jsx = jsx.replace(/\svalue="/g, ' defaultValue="');
-  jsx = jsx.replace(/\schecked="/g, ' defaultChecked="');
-  jsx = jsx.replace(/\schecked(?=\s|>)/g, ' defaultChecked');
-  jsx = jsx.replace(/\sselected="/g, ' defaultSelected="');
-  jsx = jsx.replace(/\sselected(?=\s|>)/g, ' defaultSelected');
+  // Handle any orphan text nodes or elements not caught in targets
+  if (mainJSXParts.length === 0) {
+      mainJSXParts.push(elementToJSX(body));
+  }
 
-  // Handle common event handlers
-  // We rename them to data attributes so they don't break React compile, 
-  // BUT we keep the logic in useEffect so if the original script used addEventListener it still works.
-  jsx = jsx.replace(/\son([a-z]+)="([^"]*)"/g, ' data-on-$1="$2"');
+  // 4. Construct the Final File Content
+  const subComponentCode = subComponents.map(comp => `
+/**
+ * Sub-component: ${comp.name}
+ */
+const ${comp.name} = () => (
+  ${comp.jsx}
+);
+`).join('\n');
 
-  // Clean name
-  const safeName = name.replace(/[^a-zA-Z0-9]/g, '');
-
-  // 5. Construct Component
-  return `import React, { useEffect } from 'react';
+  return `
+import React, { useEffect, useState } from 'react';
 
 /**
  * ${safeName} Component
- * Generated from HTML artifact.
+ * 
+ * This component was Manifested by AI.
+ * It has been refactored into a modular React structure with semantic sub-components.
  */
+
+${subComponentCode}
+
 export default function ${safeName}() {
+  // Local state management for interactive elements (Draft)
+  const [isInitialized, setIsInitialized] = useState(false);
+
   useEffect(() => {
-    // Execute original script logic
+    // Original script logic integration
     try {
-      ${js}
-    } catch (e) {
-      console.warn("Error running component script:", e);
+      ${scripts}
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("[${safeName}] Initialization fault:", error);
     }
   }, []);
 
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: \`${css}\` }} />
-      <div className="generated-component">
-        ${jsx}
+    <div className="${safeName.toLowerCase()}-manifestation bg-white min-h-screen">
+      <style dangerouslySetInnerHTML={{ __html: \`${styles.replace(/`/g, '\\`')}\` }} />
+      
+      {/* Root Layout Composition */}
+      <div className="layout-root">
+        ${mainJSXParts.join('\n        ')}
       </div>
-    </>
+
+      {!isInitialized && (
+        <div className="fixed inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="animate-pulse text-zinc-400 font-mono text-xs uppercase tracking-widest">
+            Syncing State...
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-`;
+`.trim();
 }

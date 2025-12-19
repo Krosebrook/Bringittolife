@@ -2,15 +2,15 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Creation } from '../types';
 
 const STORAGE_KEY = 'gemini_app_history';
+const MAX_HISTORY_ITEMS = 15; // Keeping it tight to avoid quota issues with large base64 strings
 
 export const useHistory = () => {
   const [history, setHistory] = useState<Creation[]>([]);
 
-  // Load history from local storage or fetch examples on mount
   useEffect(() => {
     const initHistory = async () => {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -24,14 +24,15 @@ export const useHistory = () => {
               timestamp: new Date(item.timestamp)
           }));
         } catch (e) {
-          console.error("Failed to load history", e);
+          console.error("Archive corruption detected:", e);
+          localStorage.removeItem(STORAGE_KEY);
         }
       }
 
       if (loadedHistory.length > 0) {
         setHistory(loadedHistory);
       } else {
-        // If no history (new user or cleared), load examples
+        // Fetch seed examples if empty
         try {
            const exampleUrls = [
                'https://storage.googleapis.com/sideprojects-asronline/bringanythingtolife/vibecode-blog.json',
@@ -40,20 +41,22 @@ export const useHistory = () => {
            ];
 
            const examples = await Promise.all(exampleUrls.map(async (url) => {
-               const res = await fetch(url);
-               if (!res.ok) return null;
-               const data = await res.json();
-               return {
-                   ...data,
-                   timestamp: new Date(data.timestamp || Date.now()),
-                   id: data.id || crypto.randomUUID()
-               };
+               try {
+                 const res = await fetch(url);
+                 if (!res.ok) return null;
+                 const data = await res.json();
+                 return {
+                     ...data,
+                     timestamp: new Date(data.timestamp || Date.now()),
+                     id: data.id || crypto.randomUUID()
+                 };
+               } catch { return null; }
            }));
            
            const validExamples = examples.filter((e): e is Creation => e !== null);
-           setHistory(validExamples);
+           if (validExamples.length > 0) setHistory(validExamples);
         } catch (e) {
-            console.error("Failed to load examples", e);
+            console.error("Example sync failed:", e);
         }
       }
     };
@@ -61,24 +64,35 @@ export const useHistory = () => {
     initHistory();
   }, []);
 
-  // Save history when it changes
+  // Persistence with LRU eviction strategy
   useEffect(() => {
-    if (history.length > 0) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-        } catch (e) {
-            console.warn("Local storage full or error saving history", e);
+    if (history.length === 0) return;
+
+    const persistHistory = (items: Creation[]) => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+          // Evict oldest item and retry recursively
+          if (items.length > 1) {
+            console.warn("Storage quota reached. Pruning oldest artifact.");
+            persistHistory(items.slice(0, -1));
+          } else {
+            localStorage.removeItem(STORAGE_KEY);
+          }
         }
-    }
+      }
+    };
+
+    persistHistory(history.slice(0, MAX_HISTORY_ITEMS));
   }, [history]);
 
-  const addCreation = (creation: Creation) => {
+  const addCreation = useCallback((creation: Creation) => {
     setHistory(prev => {
-        // Avoid duplicates if manually adding an existing ID
-        if (prev.some(c => c.id === creation.id)) return prev;
-        return [creation, ...prev];
+        const filtered = prev.filter(c => c.id !== creation.id);
+        return [creation, ...filtered].slice(0, MAX_HISTORY_ITEMS);
     });
-  };
+  }, []);
 
   return { history, setHistory, addCreation };
 };

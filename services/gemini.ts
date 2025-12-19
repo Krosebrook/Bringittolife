@@ -1,115 +1,118 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { GoogleGenAI, GenerateContentResponse, Part } from "@google/genai";
+import { GoogleGenAI, Part, GenerateContentParameters } from "@google/genai";
 import { GeneratedImageResult } from "../types";
 
-// Using gemini-3-pro-preview for complex coding tasks.
-const GEMINI_MODEL = 'gemini-3-pro-preview';
-const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+const CONFIG = {
+  MODELS: {
+    TEXT: 'gemini-3-pro-preview', // For complex reasoning and code generation
+    IMAGE: 'gemini-2.5-flash-image', // For image generation
+  },
+  GENERATION: {
+    temperature: 0.4,
+    topP: 0.95,
+  }
+};
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set.");
-}
+const SYSTEM_INSTRUCTION = `You are a world-class AI Architect and Product Designer.
+Your mission: "Manifest digital reality from analog artifacts".
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+STRATEGIC DIRECTIVES:
+1. ABSTRACT & ENHANCE: 
+   - Napkin Sketches: Convert to modern, responsive, high-fidelity UI using Tailwind CSS.
+   - Real-world Photos: Transform the essence into a Tool or Game.
+2. VISUAL RESTRICTIONS:
+   - ZERO EXTERNAL ASSETS: No img tags to external URLs.
+   - NATIVE RENDERING: Use Tailwind colors, CSS Gradients, Lucide-style SVG paths.
+3. SEMANTIC ARCHITECTURE:
+   - Use clean, modular HTML5 tags: <header>, <main>, <section>, <footer>, <nav>, <article>.
+   - These structural markers are critical for componentization.
+4. INTERACTIVITY FIRST:
+   - Every artifact must be "alive" with state management (JS) and transitions.
+   - Use vanilla JS that is clear and well-commented.
+5. PACKAGING:
+   - Single-file HTML masterpiece starting with <!DOCTYPE html>.
+   - Return ONLY the HTML. No conversational text outside markers.`;
 
-const SYSTEM_INSTRUCTION = `You are an expert AI Engineer and Product Designer specializing in "bringing artifacts to life".
-Your goal is to take a user uploaded file—which might be a polished UI design, a messy napkin sketch, a photo of a whiteboard with jumbled notes, or a picture of a real-world object (like a messy desk)—and instantly generate a fully functional, interactive, single-page HTML/JS/CSS application.
+class GeminiService {
+  private ai: GoogleGenAI;
 
-CORE DIRECTIVES:
-1. **Analyze & Abstract**: Look at the image.
-    - **Sketches/Wireframes**: Detect buttons, inputs, and layout. Turn them into a modern, clean UI.
-    - **Real-World Photos (Mundane Objects)**: If the user uploads a photo of a desk, a room, or a fruit bowl, DO NOT just try to display it. **Gamify it** or build a **Utility** around it.
-      - *Cluttered Desk* -> Create a "Clean Up" game where clicking items (represented by emojis or SVG shapes) clears them, or a Trello-style board.
-      - *Fruit Bowl* -> A nutrition tracker or a still-life painting app.
-    - **Documents/Forms**: specific interactive wizards or dashboards.
-
-2. **NO EXTERNAL IMAGES**:
-    - **CRITICAL**: Do NOT use <img src="..."> with external URLs (like imgur, placeholder.com, or generic internet URLs). They will fail.
-    - **INSTEAD**: Use **CSS shapes**, **inline SVGs**, **Emojis**, or **CSS gradients** to visually represent the elements you see in the input.
-    - If you see a "coffee cup" in the input, render a ☕ emoji or draw a cup with CSS. Do not try to load a jpg of a coffee cup.
-
-3. **Make it Interactive**: The output MUST NOT be static. It needs buttons, sliders, drag-and-drop, or dynamic visualizations.
-4. **Self-Contained**: The output must be a single HTML file with embedded CSS (<style>) and JavaScript (<script>). No external dependencies unless absolutely necessary (Tailwind via CDN is allowed).
-5. **Robust & Creative**: If the input is messy or ambiguous, generate a "best guess" creative interpretation. Never return an error. Build *something* fun and functional.
-
-RESPONSE FORMAT:
-Return ONLY the raw HTML code. Do not wrap it in markdown code blocks (\`\`\`html ... \`\`\`). Start immediately with <!DOCTYPE html>.`;
-
-/**
- * Sends a prompt and optional image to Gemini to generate an HTML application.
- */
-export async function bringToLife(prompt: string, fileBase64?: string, mimeType?: string): Promise<string> {
-  const parts: Part[] = [];
-  
-  const baseInstruction = "Analyze this image/document. Detect what functionality is implied. If it is a real-world object (like a desk), gamify it (e.g., a cleanup game). Build a fully interactive web app. IMPORTANT: Do NOT use external image URLs. Recreate the visuals using CSS, SVGs, or Emojis.";
-  
-  const finalPrompt = fileBase64 
-    ? (prompt ? `${baseInstruction}\n\nUser Context/Request: ${prompt}` : baseInstruction)
-    : prompt || "Create a demo app that shows off your capabilities.";
-
-  parts.push({ text: finalPrompt });
-
-  if (fileBase64 && mimeType) {
-    parts.push({
-      inlineData: {
-        data: fileBase64,
-        mimeType: mimeType,
-      },
-    });
+  constructor() {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) throw new Error("API_KEY is missing from environment.");
+    this.ai = new GoogleGenAI({ apiKey });
   }
 
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: {
-        parts: parts
-      },
+  async generateArtifact(prompt: string, fileBase64?: string, mimeType?: string): Promise<string> {
+    const parts: Part[] = this.prepareParts(prompt, fileBase64, mimeType);
+
+    const params: GenerateContentParameters = {
+      model: CONFIG.MODELS.TEXT,
+      contents: { parts },
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.5, // Higher temperature for more creativity with mundane inputs
+        temperature: CONFIG.GENERATION.temperature,
+        topP: CONFIG.GENERATION.topP,
       },
-    });
+    };
 
-    let text = response.text || "<!-- Failed to generate content -->";
-
-    // Cleanup if the model still included markdown fences despite instructions
-    text = text.replace(/^```html\s*/, '').replace(/^```\s*/, '').replace(/```$/, '');
-
-    return text;
-  } catch (error) {
-    console.error("Gemini Generation Error:", error);
-    throw error;
-  }
-}
-
-/**
- * Generates an image from a text prompt using Gemini Imagen 3.
- */
-export async function generateImage(prompt: string): Promise<GeneratedImageResult> {
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_IMAGE_MODEL,
-      contents: {
-        parts: [{ text: prompt }]
+    try {
+      const response = await this.ai.models.generateContent(params);
+      const rawText = response.text || "";
+      
+      // Robust extraction of HTML block
+      const htmlMatch = rawText.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i) || 
+                        rawText.match(/<html[\s\S]*?<\/html>/i);
+      
+      if (htmlMatch) {
+        return htmlMatch[0].trim();
       }
-    });
 
-    for (const candidate of response.candidates || []) {
-      for (const part of candidate.content?.parts || []) {
-        if (part.inlineData) {
-          return {
-            base64: part.inlineData.data,
-            mimeType: part.inlineData.mimeType || 'image/png'
-          };
-        }
-      }
+      // Fallback: Clean standard markdown blocks
+      return rawText.replace(/^```html\s*/i, '').replace(/^```\s*/, '').replace(/```$/, '').trim();
+    } catch (error) {
+      console.error("[GeminiService] Manifestation failed:", error);
+      throw new Error("The logic gate failed to process the artifact. Try a clearer image.");
     }
-    throw new Error("No image generated from prompt.");
-  } catch (error) {
-    console.error("Gemini Image Generation Error:", error);
-    throw error;
+  }
+
+  async generateStarterImage(prompt: string): Promise<GeneratedImageResult> {
+    try {
+      const response = await this.ai.models.generateContent({
+        model: CONFIG.MODELS.IMAGE,
+        contents: { parts: [{ text: `A clear, high-fidelity UI sketch or technical diagram for: ${prompt}` }] }
+      });
+
+      const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+      if (!part?.inlineData) throw new Error("Manifestation sequence failed to produce a visual seed.");
+
+      return {
+        base64: part.inlineData.data,
+        mimeType: part.inlineData.mimeType || 'image/png'
+      };
+    } catch (error) {
+      console.error("[GeminiService] Seed generation failed:", error);
+      throw error;
+    }
+  }
+
+  private prepareParts(prompt: string, fileBase64?: string, mimeType?: string): Part[] {
+    const context = "Analyze the visual cues in this artifact and manifest its digital soul. Reconstruct all visuals with SVGs/CSS. Ensure the code is semantic and modular.";
+    const parts: Part[] = [{ text: prompt ? `${context}\n\nUser Request: ${prompt}` : context }];
+
+    if (fileBase64 && mimeType) {
+      parts.push({
+        inlineData: { data: fileBase64, mimeType }
+      });
+    }
+
+    return parts;
   }
 }
+
+export const geminiService = new GeminiService();
+export const bringToLife = (p: string, f?: string, m?: string) => geminiService.generateArtifact(p, f, m);
+export const generateImage = (p: string) => geminiService.generateStarterImage(p);

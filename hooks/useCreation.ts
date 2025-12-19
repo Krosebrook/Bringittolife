@@ -2,19 +2,46 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useState } from 'react';
-import { Creation } from '../types';
-import { bringToLife, generateImage } from '../services/gemini';
+import { useState, useCallback } from 'react';
+import { Creation, GenerationState } from '../types';
+import { geminiService } from '../services/gemini';
 import { fileToBase64 } from '../utils/fileHelpers';
+
+const INITIAL_STATE: GenerationState = {
+  isLoading: false,
+  error: null,
+  progressStep: 0,
+};
 
 export const useCreation = (addCreationToHistory: (c: Creation) => void) => {
   const [activeCreation, setActiveCreation] = useState<Creation | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [state, setState] = useState<GenerationState>(INITIAL_STATE);
 
-  const generateFromPrompt = async (promptText: string, file?: File) => {
-    setIsGenerating(true);
+  const startGeneration = useCallback(() => {
+    setState({ isLoading: true, error: null, progressStep: 0 });
     setActiveCreation(null);
+  }, []);
 
+  const handleGenerationError = useCallback((err: any) => {
+    const message = err instanceof Error ? err.message : "Manifestation engine failure.";
+    setState({ isLoading: false, error: message, progressStep: 0 });
+  }, []);
+
+  const finalizeCreation = useCallback((html: string, name: string, imageBase64?: string, mimeType?: string) => {
+    const newCreation: Creation = {
+      id: crypto.randomUUID(),
+      name,
+      html,
+      originalImage: imageBase64 && mimeType ? `data:${mimeType};base64,${imageBase64}` : undefined,
+      timestamp: new Date(),
+    };
+    setActiveCreation(newCreation);
+    addCreationToHistory(newCreation);
+    setState(INITIAL_STATE);
+  }, [addCreationToHistory]);
+
+  const generateFromPrompt = useCallback(async (promptText: string, file?: File) => {
+    startGeneration();
     try {
       let imageBase64: string | undefined;
       let mimeType: string | undefined;
@@ -24,62 +51,43 @@ export const useCreation = (addCreationToHistory: (c: Creation) => void) => {
         mimeType = file.type.toLowerCase();
       }
 
-      const html = await bringToLife(promptText, imageBase64, mimeType);
+      const html = await geminiService.generateArtifact(promptText, imageBase64, mimeType);
       
       if (html) {
-        const newCreation: Creation = {
-          id: crypto.randomUUID(),
-          name: file ? file.name : 'New Creation',
-          html: html,
-          originalImage: imageBase64 && mimeType ? `data:${mimeType};base64,${imageBase64}` : undefined,
-          timestamp: new Date(),
-        };
-        setActiveCreation(newCreation);
-        addCreationToHistory(newCreation);
+        finalizeCreation(html, file ? file.name : 'Web Manifestation', imageBase64, mimeType);
       }
     } catch (error) {
-      console.error("Failed to generate:", error);
-      alert("Something went wrong while bringing your file to life. Please try again.");
-    } finally {
-      setIsGenerating(false);
+      handleGenerationError(error);
     }
-  };
+  }, [startGeneration, finalizeCreation, handleGenerationError]);
 
-  const generateFromText = async (prompt: string) => {
-    setIsGenerating(true);
-    setActiveCreation(null);
-
+  const generateFromText = useCallback(async (prompt: string) => {
+    startGeneration();
     try {
-        const { base64, mimeType } = await generateImage(prompt);
-        const html = await bringToLife(prompt, base64, mimeType);
+      // 1. Generate seed image
+      const { base64, mimeType } = await geminiService.generateStarterImage(prompt);
+      
+      // 2. Transmute to artifact
+      const html = await geminiService.generateArtifact(prompt, base64, mimeType);
 
-        if (html) {
-            const newCreation: Creation = {
-                id: crypto.randomUUID(),
-                name: prompt.length > 30 ? prompt.substring(0, 30) + '...' : prompt,
-                html: html,
-                originalImage: `data:${mimeType};base64,${base64}`,
-                timestamp: new Date(),
-            };
-            setActiveCreation(newCreation);
-            addCreationToHistory(newCreation);
-        }
+      if (html) {
+        const name = prompt.length > 30 ? `${prompt.substring(0, 30)}...` : prompt;
+        finalizeCreation(html, name, base64, mimeType);
+      }
     } catch (error) {
-        console.error("Failed to generate from text:", error);
-        alert("Failed to generate idea. Please try again.");
-    } finally {
-        setIsGenerating(false);
+      handleGenerationError(error);
     }
-  };
+  }, [startGeneration, finalizeCreation, handleGenerationError]);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setActiveCreation(null);
-    setIsGenerating(false);
-  };
+    setState(INITIAL_STATE);
+  }, []);
 
   return {
     activeCreation,
-    isGenerating,
+    isGenerating: state.isLoading,
+    generationError: state.error,
     generateFromPrompt,
     generateFromText,
     reset,

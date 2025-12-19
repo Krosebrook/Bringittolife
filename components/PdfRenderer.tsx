@@ -5,11 +5,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DocumentIcon } from '@heroicons/react/24/outline';
 
-// Add type definition for the global pdfjsLib
 declare global {
-  interface Window {
-    pdfjsLib: any;
-  }
+  interface Window { pdfjsLib: any; }
 }
 
 interface PdfRendererProps {
@@ -20,27 +17,21 @@ export const PdfRenderer: React.FC<PdfRendererProps> = ({ dataUrl }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const renderTaskRef = useRef<any>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const renderPdf = async () => {
       if (!window.pdfjsLib) {
-        if (isMounted) {
-          setError("PDF library not initialized");
-          setLoading(false);
-        }
+        if (isMounted) { setError("PDF Engine Offline"); setLoading(false); }
         return;
       }
 
       try {
         if (isMounted) setLoading(true);
-        
-        // Load the document
         const loadingTask = window.pdfjsLib.getDocument(dataUrl);
         const pdf = await loadingTask.promise;
-        
-        // Get the first page
         const page = await pdf.getPage(1);
         
         if (!isMounted) return;
@@ -49,25 +40,22 @@ export const PdfRenderer: React.FC<PdfRendererProps> = ({ dataUrl }) => {
         if (!canvas) return;
 
         const context = canvas.getContext('2d');
-        if (!context) throw new Error("Could not get canvas context");
+        if (!context) throw new Error("Canvas context fault");
         
-        // Calculate scale to make it look good (High DPI)
         const viewport = page.getViewport({ scale: 2.0 });
-
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
-        const renderContext = {
-          canvasContext: context,
-          viewport: viewport,
-        };
-
-        await page.render(renderContext).promise;
+        const renderContext = { canvasContext: context, viewport: viewport };
+        
+        // Store task for cleanup
+        renderTaskRef.current = page.render(renderContext);
+        await renderTaskRef.current.promise;
+        
         if (isMounted) setLoading(false);
       } catch (err) {
-        console.error("Error rendering PDF:", err);
         if (isMounted) {
-          setError("Could not render PDF preview.");
+          setError("Preview rendering faulted.");
           setLoading(false);
         }
       }
@@ -77,14 +65,17 @@ export const PdfRenderer: React.FC<PdfRendererProps> = ({ dataUrl }) => {
 
     return () => {
       isMounted = false;
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+      }
     };
   }, [dataUrl]);
 
   if (error) {
     return (
-        <div className="flex flex-col items-center justify-center h-full text-zinc-500 p-6 text-center">
+        <div className="flex flex-col items-center justify-center h-full text-zinc-500 p-6 text-center animate-in fade-in">
             <DocumentIcon className="w-12 h-12 mb-3 opacity-50 text-red-400" />
-            <p className="text-sm mb-2 text-red-400/80">{error}</p>
+            <p className="text-sm text-red-400/80">{error}</p>
         </div>
     );
   }
@@ -98,7 +89,7 @@ export const PdfRenderer: React.FC<PdfRendererProps> = ({ dataUrl }) => {
         )}
         <canvas 
             ref={canvasRef} 
-            className={`max-w-full max-h-full object-contain shadow-xl border border-zinc-800/50 rounded transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
+            className={`max-w-full max-h-full object-contain shadow-2xl border border-zinc-800/50 rounded transition-opacity duration-700 ${loading ? 'opacity-0' : 'opacity-100'}`}
         />
     </div>
   );

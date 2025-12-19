@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Hero } from './components/Hero';
 import { InputArea } from './components/InputArea';
 import { LivePreview } from './components/LivePreview';
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const { 
     activeCreation, 
     isGenerating, 
+    generationError,
     generateFromPrompt, 
     generateFromText, 
     reset, 
@@ -26,10 +27,6 @@ const App: React.FC = () => {
   
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImportClick = () => {
-    importInputRef.current?.click();
-  };
-
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -37,86 +34,64 @@ const App: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
         try {
-            const json = event.target?.result as string;
-            const parsed = JSON.parse(json);
-            
-            // Basic validation
+            const parsed = JSON.parse(event.target?.result as string);
             if (parsed.html && parsed.name) {
-                const importedCreation: Creation = {
+                const imported: Creation = {
                     ...parsed,
                     timestamp: new Date(parsed.timestamp || Date.now()),
                     id: parsed.id || crypto.randomUUID()
                 };
-                
-                addCreation(importedCreation);
-                setActiveCreation(importedCreation);
-            } else {
-                alert("Invalid creation file format.");
+                addCreation(imported);
+                setActiveCreation(imported);
             }
         } catch (err) {
-            console.error("Import error", err);
-            alert("Failed to import creation.");
+            console.error("[App] Import failed:", err);
+            alert("Invalid artifact structure.");
         }
-        // Reset input
-        if (importInputRef.current) importInputRef.current.value = '';
     };
     reader.readAsText(file);
+    if (importInputRef.current) importInputRef.current.value = '';
   };
 
-  const isFocused = !!activeCreation || isGenerating;
+  const isFocused = useMemo(() => !!activeCreation || isGenerating, [activeCreation, isGenerating]);
 
   return (
-    <div className="h-[100dvh] bg-zinc-950 bg-dot-grid text-zinc-50 selection:bg-blue-500/30 overflow-y-auto overflow-x-hidden relative flex flex-col">
-      
-      {/* Centered Content Container */}
-      <div 
+    <div className="h-[100dvh] bg-zinc-950 bg-dot-grid text-zinc-50 selection:bg-blue-500/30 overflow-y-auto overflow-x-hidden flex flex-col relative">
+      <main 
         className={`
-          min-h-full flex flex-col w-full max-w-7xl mx-auto px-4 sm:px-6 relative z-10 
-          transition-all duration-700 cubic-bezier(0.4, 0, 0.2, 1)
+          flex-1 flex flex-col w-full max-w-7xl mx-auto px-6 relative z-10 
+          transition-all duration-700 ease-in-out
           ${isFocused 
-            ? 'opacity-0 scale-95 blur-sm pointer-events-none h-[100dvh] overflow-hidden' 
+            ? 'opacity-0 scale-95 blur-2xl pointer-events-none h-[100dvh] overflow-hidden' 
             : 'opacity-100 scale-100 blur-0'
           }
         `}
       >
-        {/* Main Vertical Centering Wrapper */}
-        <div className="flex-1 flex flex-col justify-center items-center w-full py-12 md:py-20">
-          
-          {/* 1. Hero Section */}
-          <div className="w-full mb-8 md:mb-16">
+        <div className="flex-1 flex flex-col justify-center items-center w-full py-16">
+          <section className="w-full mb-16">
               <Hero />
-          </div>
+          </section>
 
-          {/* 2. Input Section */}
-          <div className="w-full flex justify-center mb-8">
+          <section className="w-full flex justify-center">
               <InputArea 
                 onGenerate={generateFromPrompt} 
                 onTextToImage={generateFromText}
                 isGenerating={isGenerating} 
+                error={generationError}
                 disabled={isFocused} 
               />
-          </div>
-
+          </section>
         </div>
         
-        {/* 3. History Section & Footer - Stays at bottom */}
-        <div className="flex-shrink-0 pb-6 w-full mt-auto flex flex-col items-center gap-6">
-            <div className="w-full px-2 md:px-0">
-                <CreationHistory history={history} onSelect={setActiveCreation} />
+        <footer className="mt-auto pb-12 flex flex-col items-center gap-12">
+            <CreationHistory history={history} onSelect={setActiveCreation} />
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[10px] text-zinc-800 font-mono tracking-[0.3em] uppercase">Manifest Engine v2.1</span>
+              <a href="https://x.com/ammaar" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-white text-xs font-mono transition-colors">@ammaar</a>
             </div>
-            
-            <a 
-              href="https://x.com/ammaar" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-zinc-600 hover:text-zinc-400 text-xs font-mono transition-colors pb-2"
-            >
-              Created by @ammaar
-            </a>
-        </div>
-      </div>
+        </footer>
+      </main>
 
-      {/* Live Preview - Always mounted for smooth transition */}
       <LivePreview
         creation={activeCreation}
         isLoading={isGenerating}
@@ -124,14 +99,14 @@ const App: React.FC = () => {
         onReset={reset}
       />
 
-      {/* Subtle Import Button (Bottom Right) */}
-      <div className="fixed bottom-4 right-4 z-50 group">
-        <Tooltip content="Import Artifact" side="top">
+      {/* Persistent global action bar */}
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4">
+        <Tooltip content="Restore Artifact JSON" side="top">
             <button 
-                onClick={handleImportClick}
-                className="flex items-center space-x-2 p-2 text-zinc-500 hover:text-zinc-300 transition-colors opacity-60 hover:opacity-100"
+                onClick={() => importInputRef.current?.click()}
+                className="flex items-center space-x-2 bg-zinc-900/40 backdrop-blur-lg border border-zinc-800 p-3.5 rounded-full text-zinc-500 hover:text-white transition-all hover:border-zinc-600 hover:shadow-xl active:scale-90"
+                aria-label="Import JSON"
             >
-                <span className="text-xs font-medium uppercase tracking-wider hidden sm:inline">Upload previous artifact</span>
                 <ArrowUpTrayIcon className="w-5 h-5" />
             </button>
         </Tooltip>

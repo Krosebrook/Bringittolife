@@ -6,14 +6,8 @@
 
 /**
  * World-class HTML to React Component Transformer.
- * Uses the browser's DOMParser to intelligently decompose flat HTML 
- * into a modular, reusable React architecture.
+ * Intelligently decomposes flat HTML into a modular React architecture.
  */
-
-interface ComponentModule {
-  name: string;
-  jsx: string;
-}
 
 const ATTRIBUTE_MAP: Record<string, string> = {
   'class': 'className',
@@ -27,31 +21,38 @@ const ATTRIBUTE_MAP: Record<string, string> = {
   'autofocus': 'autoFocus',
   'readonly': 'readOnly',
   'maxlength': 'maxLength',
+  'viewbox': 'viewBox',
   'stroke-width': 'strokeWidth',
   'stroke-linecap': 'strokeLinecap',
   'stroke-linejoin': 'strokeLinejoin',
   'fill-rule': 'fillRule',
   'clip-rule': 'clipRule',
-  'viewbox': 'viewBox',
+  'stop-color': 'stopColor',
+  'stop-opacity': 'stopOpacity',
+  'font-family': 'fontFamily',
+  'font-size': 'fontSize',
+  'text-anchor': 'textAnchor',
 };
 
 function toCamelCase(str: string) {
   return str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
-function parseStyle(style: CSSStyleDeclaration): string {
-  if (!style || style.length === 0) return '';
-  const obj: Record<string, string> = {};
-  for (let i = 0; i < style.length; i++) {
-    const prop = style[i];
-    obj[toCamelCase(prop)] = style.getPropertyValue(prop);
-  }
-  return JSON.stringify(obj);
+function parseStyle(styleString: string): string {
+  if (!styleString) return '{}';
+  const styleObj: Record<string, string> = {};
+  styleString.split(';').forEach(pair => {
+    const [key, value] = pair.split(':').map(s => s.trim());
+    if (key && value) {
+      styleObj[toCamelCase(key)] = value;
+    }
+  });
+  return JSON.stringify(styleObj);
 }
 
 function elementToJSX(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent || '';
+    return node.textContent ? node.textContent.replace(/{/g, '{"{"}').replace(/}/g, '{"}"}') : '';
   }
   if (node.nodeType === Node.COMMENT_NODE) {
     return `{/* ${node.textContent} */}`;
@@ -63,7 +64,6 @@ function elementToJSX(node: Node): string {
   const el = node as HTMLElement;
   const tagName = el.tagName.toLowerCase();
   
-  // Skip script and style tags as they are handled separately
   if (tagName === 'script' || tagName === 'style') return '';
 
   const attributes: string[] = [];
@@ -73,13 +73,16 @@ function elementToJSX(node: Node): string {
     const name = ATTRIBUTE_MAP[attr.name.toLowerCase()] || attr.name;
     
     if (name === 'style') {
-      attributes.push(`${name}={${parseStyle(el.style)}}`);
+      attributes.push(`${name}={${parseStyle(attr.value)}}`);
     } else if (name.startsWith('on')) {
-      // Event handlers are tricky to convert from string to React without state mapping.
-      // We keep them as data attributes for transparency or as a starting point.
-      attributes.push(`data-${name}="${attr.value}"`);
+      attributes.push(`data-${name}="${attr.value.replace(/"/g, '&quot;')}"`);
     } else {
-      attributes.push(`${name}="${attr.value.replace(/"/g, '&quot;')}"`);
+      // Boolean attributes in React
+      if (['disabled', 'checked', 'required', 'readOnly', 'hidden'].includes(name) && attr.value === '') {
+        attributes.push(`${name}={true}`);
+      } else {
+        attributes.push(`${name}="${attr.value.replace(/"/g, '&quot;')}"`);
+      }
     }
   }
 
@@ -87,7 +90,7 @@ function elementToJSX(node: Node): string {
     .map(child => elementToJSX(child))
     .join('');
 
-  const selfClosing = ['img', 'input', 'br', 'hr', 'meta', 'link'].includes(tagName);
+  const selfClosing = ['img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'param', 'source', 'track', 'wbr'].includes(tagName);
   
   if (selfClosing) {
     return `<${tagName} ${attributes.join(' ')} />`;
@@ -102,24 +105,19 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
   
   const safeName = originalName.replace(/[^a-zA-Z0-9]/g, '') || 'ManifestedApp';
   
-  // 1. Extract Styles
   const styles = Array.from(doc.querySelectorAll('style'))
     .map(s => s.textContent)
     .join('\n');
 
-  // 2. Extract Scripts
   const scripts = Array.from(doc.querySelectorAll('script'))
     .map(s => s.textContent)
     .join('\n');
 
-  // 3. Decompose Body into Modular Sections
   const body = doc.body;
-  const subComponents: ComponentModule[] = [];
+  const subComponents: { name: string, jsx: string }[] = [];
   
-  // Find major semantic containers to convert into sub-components
+  // Strategy: Find semantic chunks or top-level elements
   const containers = body.querySelectorAll('header, main, footer, section, nav, aside');
-  
-  // If we have semantic containers, use them. Otherwise, take top-level children.
   const targets = containers.length > 0 
     ? Array.from(containers).filter(c => c.parentElement === body)
     : Array.from(body.children);
@@ -127,24 +125,19 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
   const mainJSXParts: string[] = [];
 
   targets.forEach((el, index) => {
-    const tagName = el.tagName.toLowerCase();
-    const componentName = `${tagName.charAt(0).toUpperCase() + tagName.slice(1)}${index + 1}`;
+    const baseName = el.tagName.toLowerCase();
+    const componentName = `${baseName.charAt(0).toUpperCase() + baseName.slice(1)}Section${index + 1}`;
     const jsx = elementToJSX(el);
     
     subComponents.push({ name: componentName, jsx });
     mainJSXParts.push(`<${componentName} />`);
   });
 
-  // Handle any orphan text nodes or elements not caught in targets
-  if (mainJSXParts.length === 0) {
+  if (mainJSXParts.length === 0 && body.innerHTML.trim() !== '') {
       mainJSXParts.push(elementToJSX(body));
   }
 
-  // 4. Construct the Final File Content
   const subComponentCode = subComponents.map(comp => `
-/**
- * Sub-component: ${comp.name}
- */
 const ${comp.name} = () => (
   ${comp.jsx}
 );
@@ -155,41 +148,34 @@ import React, { useEffect, useState } from 'react';
 
 /**
  * ${safeName} Component
- * 
- * This component was Manifested by AI.
- * It has been refactored into a modular React structure with semantic sub-components.
+ * Manifested by Gemini AI. Modularized React structure.
  */
 
 ${subComponentCode}
 
 export default function ${safeName}() {
-  // Local state management for interactive elements (Draft)
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Original script logic integration
     try {
-      ${scripts}
-      setIsInitialized(true);
+      ${scripts ? scripts : '// No script logic found'}
+      setIsReady(true);
     } catch (error) {
-      console.error("[${safeName}] Initialization fault:", error);
+      console.error("[${safeName}] Hook fault:", error);
     }
   }, []);
 
   return (
-    <div className="${safeName.toLowerCase()}-manifestation bg-white min-h-screen">
-      <style dangerouslySetInnerHTML={{ __html: \`${styles.replace(/`/g, '\\`')}\` }} />
+    <div className="manifest-container min-h-screen bg-white text-zinc-900">
+      <style dangerouslySetInnerHTML={{ __html: \`${styles.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\` }} />
       
-      {/* Root Layout Composition */}
-      <div className="layout-root">
+      <div className="manifest-layout">
         ${mainJSXParts.join('\n        ')}
       </div>
 
-      {!isInitialized && (
-        <div className="fixed inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="animate-pulse text-zinc-400 font-mono text-xs uppercase tracking-widest">
-            Syncing State...
-          </div>
+      {!isReady && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur flex items-center justify-center z-50">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       )}
     </div>

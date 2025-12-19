@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,13 +7,27 @@ import { useState, useEffect, useCallback } from 'react';
 import { Creation } from '../types';
 
 const STORAGE_KEY = 'gemini_app_history';
-const MAX_HISTORY_ITEMS = 15; // Keeping it tight to avoid quota issues with large base64 strings
+const MAX_HISTORY_ITEMS = 15;
 
 export const useHistory = () => {
   const [history, setHistory] = useState<Creation[]>([]);
 
+  // Proactive storage health check
+  const isStorageAvailable = () => {
+    try {
+      const x = '__storage_test__';
+      localStorage.setItem(x, x);
+      localStorage.removeItem(x);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
   useEffect(() => {
     const initHistory = async () => {
+      if (!isStorageAvailable()) return;
+      
       const saved = localStorage.getItem(STORAGE_KEY);
       let loadedHistory: Creation[] = [];
 
@@ -24,7 +39,7 @@ export const useHistory = () => {
               timestamp: new Date(item.timestamp)
           }));
         } catch (e) {
-          console.error("Archive corruption detected:", e);
+          console.error("Archive corruption detected. Purging storage.", e);
           localStorage.removeItem(STORAGE_KEY);
         }
       }
@@ -32,7 +47,11 @@ export const useHistory = () => {
       if (loadedHistory.length > 0) {
         setHistory(loadedHistory);
       } else {
-        // Fetch seed examples if empty
+        await fetchSeedExamples();
+      }
+    };
+
+    const fetchSeedExamples = async () => {
         try {
            const exampleUrls = [
                'https://storage.googleapis.com/sideprojects-asronline/bringanythingtolife/vibecode-blog.json',
@@ -40,51 +59,52 @@ export const useHistory = () => {
                'https://storage.googleapis.com/sideprojects-asronline/bringanythingtolife/chess.json'
            ];
 
-           const examples = await Promise.all(exampleUrls.map(async (url) => {
-               try {
-                 const res = await fetch(url);
-                 if (!res.ok) return null;
-                 const data = await res.json();
-                 return {
-                     ...data,
-                     timestamp: new Date(data.timestamp || Date.now()),
-                     id: data.id || crypto.randomUUID()
-                 };
-               } catch { return null; }
-           }));
+           const results = await Promise.allSettled(exampleUrls.map(url => fetch(url).then(res => res.json())));
+           const valid = results
+             .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+             .map(r => ({
+                 ...r.value,
+                 timestamp: new Date(r.value.timestamp || Date.now()),
+                 id: r.value.id || crypto.randomUUID()
+             }));
            
-           const validExamples = examples.filter((e): e is Creation => e !== null);
-           if (validExamples.length > 0) setHistory(validExamples);
+           if (valid.length > 0) setHistory(valid);
         } catch (e) {
-            console.error("Example sync failed:", e);
+            console.warn("Could not sync remote seed examples:", e);
         }
-      }
     };
 
     initHistory();
   }, []);
 
-  // Persistence with LRU eviction strategy
+  // Proactive Storage Management (Edge Case: Large Artifacts)
   useEffect(() => {
-    if (history.length === 0) return;
+    if (history.length === 0 || !isStorageAvailable()) return;
 
-    const persistHistory = (items: Creation[]) => {
+    const tryPersist = (data: Creation[]): boolean => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        return true;
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-          // Evict oldest item and retry recursively
-          if (items.length > 1) {
-            console.warn("Storage quota reached. Pruning oldest artifact.");
-            persistHistory(items.slice(0, -1));
-          } else {
-            localStorage.removeItem(STORAGE_KEY);
-          }
-        }
+        return false;
       }
     };
 
-    persistHistory(history.slice(0, MAX_HISTORY_ITEMS));
+    // Attempt to save. If fails, prune oldest images first, then oldest items.
+    let currentHistory = [...history].slice(0, MAX_HISTORY_ITEMS);
+    let success = tryPersist(currentHistory);
+
+    if (!success) {
+      console.warn("Storage quota approaching. Stripping large binary assets from old history.");
+      // Edge Case: Keep metadata but remove Base64 strings from items 5+
+      currentHistory = currentHistory.map((item, idx) => (idx > 4 ? { ...item, originalImage: undefined } : item));
+      success = tryPersist(currentHistory);
+    }
+
+    if (!success) {
+      console.error("Storage critical failure. Reducing history to 3 items.");
+      tryPersist(currentHistory.slice(0, 3));
+    }
   }, [history]);
 
   const addCreation = useCallback((creation: Creation) => {
@@ -94,5 +114,10 @@ export const useHistory = () => {
     });
   }, []);
 
-  return { history, setHistory, addCreation };
+  const clearHistory = useCallback(() => {
+      setHistory([]);
+      localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  return { history, setHistory, addCreation, clearHistory };
 };

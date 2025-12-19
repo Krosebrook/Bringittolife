@@ -1,9 +1,12 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
 export type ArtifactType = 'app' | 'game' | 'utility' | 'dashboard';
+
+export type DeviceMode = 'desktop' | 'tablet' | 'mobile';
 
 export interface Creation {
   id: string;

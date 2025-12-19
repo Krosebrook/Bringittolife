@@ -3,16 +3,17 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useEffect, useState, useRef } from 'react';
-import { Creation } from '../types';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Creation, DeviceMode } from '../types';
 import { usePanZoom } from '../hooks/usePanZoom';
-import { PreviewToolbar, DeviceMode } from './PreviewToolbar';
+import { PreviewToolbar } from './PreviewToolbar';
 import { downloadArtifact, downloadFile } from '../utils/fileHelpers';
 import { convertToReactComponent } from '../utils/reactConverter';
 import { ManifestationLoading } from './live/ManifestationLoading';
 import { ReferencePanel } from './live/ReferencePanel';
 import { SimulatorViewport } from './live/SimulatorViewport';
 import { useIframeContent } from '../hooks/useIframeContent';
+import { CssEditorPanel } from './live/CssEditorPanel';
 
 interface LivePreviewProps {
   creation: Creation | null;
@@ -21,13 +22,13 @@ interface LivePreviewProps {
   onReset: () => void;
 }
 
-/**
- * ROOT COMPONENT: LivePreview
- * Orchestrates the entire manifestation preview interface.
- */
+export type SidePanelType = 'reference' | 'css';
+
 export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, isFocused, onReset }) => {
     const [loadingStep, setLoadingStep] = useState(0);
     const [showSplitView, setShowSplitView] = useState(false);
+    const [activeSidePanel, setActiveSidePanel] = useState<SidePanelType>('reference');
+    const [customCss, setCustomCss] = useState<string>("");
     const [isCopied, setIsCopied] = useState(false);
     const [isDragMode, setIsDragMode] = useState(false);
     const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
@@ -41,36 +42,52 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const srcDoc = useIframeContent(creation);
 
-    // Progress animation loop for generation state
-    useEffect(() => {
-        if (isLoading) {
-            setLoadingStep(0);
-            const interval = setInterval(() => {
-                setLoadingStep(prev => (prev < 3 ? prev + 1 : prev));
-            }, 1800); 
-            return () => clearInterval(interval);
-        }
-    }, [isLoading]);
+    // Sync state for CSS updates
+    const syncCssToIframe = useCallback((css: string) => {
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({ type: 'update-css', css }, '*');
+      }
+    }, []);
 
-    // Cleanup and environment reset on creation context switch
+    // Initial CSS Extraction
     useEffect(() => {
-        if (creation?.originalImage) setShowSplitView(true);
+        if (creation?.html) {
+            const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+            let initialCss = "";
+            let match;
+            while ((match = styleRegex.exec(creation.html)) !== null) {
+                initialCss += match[1].trim() + "\n\n";
+            }
+            setCustomCss(initialCss.trim());
+        } else {
+            setCustomCss("");
+        }
+    }, [creation?.id]);
+
+    // Live Synchronizer (Throttled via React effect)
+    useEffect(() => {
+        syncCssToIframe(customCss);
+    }, [customCss, syncCssToIframe]);
+
+    // Cleanup and environment reset
+    useEffect(() => {
+        if (creation?.originalImage) {
+            setShowSplitView(true);
+            setActiveSidePanel('reference');
+        }
         setIsDragMode(false);
         setDeviceMode('desktop');
         setIsLandscape(false);
         resetView();
         setIsPanMode(false);
-    }, [creation, resetView, setIsPanMode]);
+    }, [creation?.id, resetView, setIsPanMode]);
 
-    // Handle cross-context message passing for drag-and-drop state
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (iframeRef.current?.contentWindow) {
-                iframeRef.current.contentWindow.postMessage(isDragMode ? 'enable-drag' : 'disable-drag', '*');
-            }
-        }, 50);
-        return () => clearTimeout(timer);
-    }, [isDragMode, creation]);
+    const handleIframeLoad = () => {
+        if (iframeRef.current?.contentWindow) {
+            iframeRef.current.contentWindow.postMessage(isDragMode ? 'enable-drag' : 'disable-drag', '*');
+            syncCssToIframe(customCss);
+        }
+    };
 
     const handleCopyCode = async () => {
         if (!creation?.html) return;
@@ -79,13 +96,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
         } catch (err) {
-            console.error('Clipboard fault:', err);
-        }
-    };
-
-    const handleIframeLoad = () => {
-        if (isDragMode && iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage('enable-drag', '*');
+            console.error('Clipboard copy failed:', err);
         }
     };
 
@@ -104,6 +115,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
           isLandscape={isLandscape}
           isDragMode={isDragMode}
           showSplitView={showSplitView}
+          activeSidePanel={activeSidePanel}
           isCopied={isCopied}
           onReset={onReset}
           onZoomIn={zoomIn}
@@ -113,6 +125,14 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
           onChangeDeviceMode={setDeviceMode}
           onToggleOrientation={() => setIsLandscape(!isLandscape)}
           onToggleSplitView={() => setShowSplitView(!showSplitView)}
+          onToggleSidePanel={(type) => {
+              if (activeSidePanel === type && showSplitView) {
+                  setShowSplitView(false);
+              } else {
+                  setActiveSidePanel(type);
+                  setShowSplitView(true);
+              }
+          }}
           onToggleDragMode={() => { setIsDragMode(!isDragMode); setIsPanMode(false); }}
           onExportPdf={() => iframeRef.current?.contentWindow?.print()}
           onExportJson={() => creation && downloadArtifact(creation, `artifact_${creation.id}.json`)}
@@ -126,8 +146,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
             <ManifestationLoading step={loadingStep} />
           ) : creation ? (
             <>
-              {showSplitView && creation.originalImage && (
-                <ReferencePanel image={creation.originalImage} />
+              {showSplitView && (
+                  activeSidePanel === 'reference' && creation.originalImage ? (
+                    <ReferencePanel image={creation.originalImage} />
+                  ) : activeSidePanel === 'css' ? (
+                    <CssEditorPanel css={customCss} onChange={setCustomCss} />
+                  ) : null
               )}
               <SimulatorViewport 
                 srcDoc={srcDoc}

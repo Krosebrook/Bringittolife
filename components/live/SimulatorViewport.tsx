@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
-import { DeviceMode } from '../PreviewToolbar';
+import { DeviceMode } from '../../types';
 
 /**
  * SUB-COMPONENT: EnvironmentOverlay

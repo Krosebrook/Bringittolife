@@ -9,8 +9,7 @@ import { INTERACTIVE_STYLES, DRAG_SCRIPT, SUBTLE_BACKGROUND_STYLE } from '../uti
 
 /**
  * UTILITY: CSS Extraction & Virtualization
- * Edge Case: Model sometimes puts styles in <style> or directly in body. 
- * We consolidate them into a controlled virtual stylesheet.
+ * Consolidates system framework styles into a single Object URL.
  */
 const createSystemStylesheet = (): string => {
   const stripTags = (html: string) => html.replace(/<style[^>]*>|<\/style>/gi, '');
@@ -24,7 +23,7 @@ const createSystemStylesheet = (): string => {
 };
 
 const assembleIframeDoc = (rawHtml: string, systemCssUrl: string, initialCss: string): string => {
-  // Edge Case: Handle fragments of HTML that might not have body/html tags
+  // Strip existing styles to avoid model-provided style conflicts with live injection
   const bodyContent = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
   
   const headInjections = [
@@ -34,24 +33,25 @@ const assembleIframeDoc = (rawHtml: string, systemCssUrl: string, initialCss: st
     `<style id="manifest-live-css">${initialCss}</style>`,
     `<script>
       (function() {
+        // Master Listener for Real-time Manifestation Control
         window.addEventListener('message', (event) => {
           if (!event.data) return;
           
-          // Case 1: Live CSS Sync
+          // CSS Morphing Logic
           if (event.data.type === 'update-css') {
             const styleTag = document.getElementById('manifest-live-css');
             if (styleTag) styleTag.innerHTML = event.data.css;
           }
           
-          // Case 2: Drag Mode Control
+          // Simulation Drag/Pan Logic
           if (event.data === 'enable-drag' || event.data === 'disable-drag') {
             window.dispatchEvent(new MessageEvent('message', { data: event.data }));
           }
         });
         
-        // Error isolation for user scripts
+        // Error Isolation
         window.onerror = function(msg, url, line) {
-          console.warn("[Manifested Artifact Runtime] " + msg + " at line " + line);
+          console.debug("[Iframe Runtime] Isolated Error Catch: " + msg);
           return true;
         };
       })();
@@ -59,8 +59,9 @@ const assembleIframeDoc = (rawHtml: string, systemCssUrl: string, initialCss: st
     DRAG_SCRIPT 
   ].join('\n    ');
 
-  // Edge Case: If model provided a full document, inject into head. Otherwise wrap.
   const lowerHtml = bodyContent.toLowerCase();
+  
+  // Heuristic: Inject into head if exists, otherwise construct standard wrapper
   if (lowerHtml.includes('</head>')) {
     return bodyContent.replace(/<\/head>/i, `${headInjections}\n</head>`);
   } else if (lowerHtml.includes('<html')) {
@@ -69,8 +70,12 @@ const assembleIframeDoc = (rawHtml: string, systemCssUrl: string, initialCss: st
   
   return `<!DOCTYPE html>
 <html lang="en">
-<head>${headInjections}</head>
-<body>${bodyContent}</body>
+<head>
+    ${headInjections}
+</head>
+<body>
+    ${bodyContent}
+</body>
 </html>`;
 };
 
@@ -81,12 +86,13 @@ export const useIframeContent = (creation: Creation | null) => {
     const url = createSystemStylesheet();
     setSystemCssUrl(url);
     
-    // Memory Safety: Revoke Blob URL on unmount to prevent leaks
+    // Memory Safety
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
   }, []);
 
+  // Compute initial CSS state only when the creation itself changes (avoiding flicker)
   const initialCss = useMemo(() => {
     if (!creation?.html) return '';
     const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;

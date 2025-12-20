@@ -7,12 +7,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Creation } from '../types';
 
 const STORAGE_KEY = 'gemini_app_history';
-const MAX_HISTORY_ITEMS = 15;
+const MAX_HISTORY_ITEMS = 12;
 
 export const useHistory = () => {
   const [history, setHistory] = useState<Creation[]>([]);
 
-  // Proactive storage health check
   const isStorageAvailable = () => {
     try {
       const x = '__storage_test__';
@@ -39,7 +38,7 @@ export const useHistory = () => {
               timestamp: new Date(item.timestamp)
           }));
         } catch (e) {
-          console.error("Archive corruption detected. Purging storage.", e);
+          console.error("Archive sync fault. Purging history.", e);
           localStorage.removeItem(STORAGE_KEY);
         }
       }
@@ -65,19 +64,22 @@ export const useHistory = () => {
              .map(r => ({
                  ...r.value,
                  timestamp: new Date(r.value.timestamp || Date.now()),
-                 id: r.value.id || crypto.randomUUID()
+                 id: r.value.id || (typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2))
              }));
            
            if (valid.length > 0) setHistory(valid);
         } catch (e) {
-            console.warn("Could not sync remote seed examples:", e);
+            console.warn("Seed data unreachable:", e);
         }
     };
 
     initHistory();
   }, []);
 
-  // Proactive Storage Management (Edge Case: Large Artifacts)
+  /**
+   * PROACTIVE PERSISTENCE ENGINE
+   * Handles QuotaExceededError by pruning binary assets from older items.
+   */
   useEffect(() => {
     if (history.length === 0 || !isStorageAvailable()) return;
 
@@ -90,20 +92,21 @@ export const useHistory = () => {
       }
     };
 
-    // Attempt to save. If fails, prune oldest images first, then oldest items.
     let currentHistory = [...history].slice(0, MAX_HISTORY_ITEMS);
     let success = tryPersist(currentHistory);
 
     if (!success) {
-      console.warn("Storage quota approaching. Stripping large binary assets from old history.");
-      // Edge Case: Keep metadata but remove Base64 strings from items 5+
-      currentHistory = currentHistory.map((item, idx) => (idx > 4 ? { ...item, originalImage: undefined } : item));
+      // Step 1: Prune images from all but the last 3 items
+      currentHistory = currentHistory.map((item, idx) => 
+        idx > 2 ? { ...item, originalImage: undefined } : item
+      );
       success = tryPersist(currentHistory);
     }
 
     if (!success) {
-      console.error("Storage critical failure. Reducing history to 3 items.");
-      tryPersist(currentHistory.slice(0, 3));
+      // Step 2: Critical Pruning - save metadata only
+      currentHistory = currentHistory.map(item => ({ ...item, html: "<!-- Pruned due to storage limits -->", originalImage: undefined }));
+      tryPersist(currentHistory.slice(0, 5));
     }
   }, [history]);
 

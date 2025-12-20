@@ -12,7 +12,7 @@ const CONFIG = {
     IMAGE: 'gemini-2.5-flash-image',
   },
   GENERATION: {
-    temperature: 0.3, // Lowered for higher code consistency
+    temperature: 0.3, 
     topP: 0.9,
   }
 };
@@ -21,7 +21,8 @@ const SYSTEM_INSTRUCTION = `You are a world-class AI Architect.
 Return ONLY high-fidelity, interactive HTML5/Tailwind/VanillaJS code. 
 Must start with <!DOCTYPE html>. 
 No markdown markers unless strictly necessary. 
-No text before or after the code block.`;
+No text before or after the code block. 
+Ensure accessibility (ARIA) and responsive design are built-in.`;
 
 class GeminiService {
   private ai: GoogleGenAI;
@@ -46,49 +47,54 @@ class GeminiService {
         },
       });
 
-      return this.extractRobustHtml(response.text || "");
+      const raw = response.text || "";
+      return this.extractRobustHtml(raw);
     } catch (error) {
       console.error("[GeminiService] Content generation failed:", error);
-      throw new Error("The manifestation gateway timed out. Please verify your prompt or image clarity.");
+      throw new Error("The manifestation gateway timed out or rejected the request. Please verify your prompt or image clarity.");
     }
   }
 
   /**
-   * Multi-pass HTML Extraction
-   * Pass 1: Look for standard doctype
-   * Pass 2: Look for html tags
-   * Pass 3: Look for markdown code blocks
-   * Pass 4: Greedy capture between first and last tags
+   * Multi-pass Heuristic HTML Extraction
+   * Handles conversational filler, malformed markdown, and fragments.
    */
   private extractRobustHtml(text: string): string {
     const trimmed = text.trim();
     
-    // Pass 1 & 2
-    const docMatch = trimmed.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i) || 
-                     trimmed.match(/<html[\s\S]*?<\/html>/i);
-    if (docMatch) return docMatch[0];
+    // Pass 1: Standard Full Document
+    const fullDocMatch = trimmed.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);
+    if (fullDocMatch) return fullDocMatch[0];
 
-    // Pass 3: Markdown Extraction with cleaning
-    const mdMatch = trimmed.match(/```(?:html)?\s*([\s\S]*?)\s*```/i);
-    if (mdMatch) return mdMatch[1];
+    // Pass 2: Root Tag Capture
+    const htmlTagMatch = trimmed.match(/<html[\s\S]*?<\/html>/i);
+    if (htmlTagMatch) return htmlTagMatch[0];
 
-    // Pass 4: Heuristic fallback
-    if (trimmed.toLowerCase().includes('<body') || trimmed.toLowerCase().includes('<div')) {
+    // Pass 3: Markdown Block Extraction
+    const mdBlockMatch = trimmed.match(/```(?:html|xml)?\s*([\s\S]*?)\s*```/i);
+    if (mdBlockMatch) return mdBlockMatch[1];
+
+    // Pass 4: Greedy Fragment Recovery
+    const fragmentMatch = trimmed.match(/<(head|body|div|section)[\s\S]*<\/\1>/i);
+    if (fragmentMatch) return fragmentMatch[0];
+
+    // Fallback: If it looks like code, return as-is
+    if (trimmed.includes('<') && trimmed.includes('>')) {
       return trimmed;
     }
 
-    return "<!-- System Error: Failed to extract valid manifest from model response. -->";
+    return "<!-- Error: Failed to extract artifact logic from model response. -->";
   }
 
   async generateStarterImage(prompt: string): Promise<GeneratedImageResult> {
     try {
       const response = await this.ai.models.generateContent({
         model: CONFIG.MODELS.IMAGE,
-        contents: { parts: [{ text: `High fidelity UI concept sketch: ${prompt}` }] }
+        contents: { parts: [{ text: `High fidelity UI concept or technical blueprint for: ${prompt}` }] }
       });
 
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-      if (!part?.inlineData) throw new Error("Image synthesis rejected.");
+      if (!part?.inlineData) throw new Error("Image synthesis sequence failed.");
 
       return {
         base64: part.inlineData.data,
@@ -101,10 +107,13 @@ class GeminiService {
   }
 
   private prepareParts(prompt: string, fileBase64?: string, mimeType?: string): Part[] {
-    const parts: Part[] = [{ text: prompt || "Manifest a functional tool or experience based on this artifact." }];
+    const prefix = "Analyze these visual/textual signals and manifest a high-fidelity digital artifact. Use Tailwind for styling and Vanilla JS for interactions. Semantic HTML5 is mandatory.";
+    const parts: Part[] = [{ text: prompt ? `${prefix}\n\nUser Request: ${prompt}` : prefix }];
+    
     if (fileBase64 && mimeType) {
       parts.push({ inlineData: { data: fileBase64, mimeType } });
     }
+    
     return parts;
   }
 }

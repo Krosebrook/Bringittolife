@@ -32,6 +32,8 @@ const ATTRIBUTE_MAP: Record<string, string> = {
   'font-family': 'fontFamily',
   'font-size': 'fontSize',
   'text-anchor': 'textAnchor',
+  'gradientunits': 'gradientUnits',
+  'preserveaspectratio': 'preserveAspectRatio',
 };
 
 function toCamelCase(str: string) {
@@ -75,10 +77,11 @@ function elementToJSX(node: Node): string {
     if (name === 'style') {
       attributes.push(`${name}={${parseStyle(attr.value)}}`);
     } else if (name.startsWith('on')) {
+      // Preserve event handlers as data attributes for visibility, 
+      // though functional mapping requires manual wiring.
       attributes.push(`data-${name}="${attr.value.replace(/"/g, '&quot;')}"`);
     } else {
-      // Boolean attributes in React
-      if (['disabled', 'checked', 'required', 'readOnly', 'hidden'].includes(name) && attr.value === '') {
+      if (['disabled', 'checked', 'required', 'readOnly', 'hidden'].includes(name) && (attr.value === '' || attr.value === 'true')) {
         attributes.push(`${name}={true}`);
       } else {
         attributes.push(`${name}="${attr.value.replace(/"/g, '&quot;')}"`);
@@ -116,7 +119,7 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
   const body = doc.body;
   const subComponents: { name: string, jsx: string }[] = [];
   
-  // Strategy: Find semantic chunks or top-level elements
+  // Strategy: Identify top-level semantic sections
   const containers = body.querySelectorAll('header, main, footer, section, nav, aside');
   const targets = containers.length > 0 
     ? Array.from(containers).filter(c => c.parentElement === body)
@@ -148,34 +151,35 @@ import React, { useEffect, useState } from 'react';
 
 /**
  * ${safeName} Component
- * Manifested by Gemini AI. Modularized React structure.
+ * Automated React transmutation of manifested AI artifact.
  */
 
 ${subComponentCode}
 
 export default function ${safeName}() {
-  const [isReady, setIsReady] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     try {
-      ${scripts ? scripts : '// No script logic found'}
-      setIsReady(true);
+      // Injected Logic Engine
+      ${scripts ? scripts : '// No internal scripts detected'}
     } catch (error) {
-      console.error("[${safeName}] Hook fault:", error);
+      console.warn("[${safeName}] Initialization warning:", error);
     }
   }, []);
 
   return (
-    <div className="manifest-container min-h-screen bg-white text-zinc-900">
+    <div className="manifest-root min-h-screen bg-white">
       <style dangerouslySetInnerHTML={{ __html: \`${styles.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\` }} />
       
-      <div className="manifest-layout">
+      <div className="manifest-content">
         ${mainJSXParts.join('\n        ')}
       </div>
 
-      {!isReady && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur flex items-center justify-center z-50">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      {!isMounted && (
+        <div className="fixed inset-0 bg-white flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       )}
     </div>

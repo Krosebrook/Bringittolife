@@ -3,10 +3,11 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
+import { THEME_VARIABLES } from './injection';
 
 /**
  * World-class HTML to React Component Transformer.
- * Intelligently decomposes flat HTML into a modular React architecture.
+ * Intelligently decomposes flat HTML into a modular, state-aware React architecture.
  */
 
 const ATTRIBUTE_MAP: Record<string, string> = {
@@ -52,9 +53,31 @@ function parseStyle(styleString: string): string {
   return JSON.stringify(styleObj);
 }
 
-function elementToJSX(node: Node): string {
+/**
+ * Heuristically determines if an element might be a stateful component.
+ */
+function isPotentialSubComponent(el: HTMLElement): boolean {
+  const tagName = el.tagName.toLowerCase();
+  const classes = el.className.toLowerCase();
+  const id = el.id.toLowerCase();
+  
+  // Semantic containers are always components
+  if (['nav', 'header', 'footer', 'main', 'section', 'aside'].includes(tagName)) return true;
+  
+  // UI Patterns
+  if (classes.includes('card') || classes.includes('modal') || classes.includes('item')) return true;
+  
+  // ID-based logic
+  if (id.includes('container') || id.includes('wrapper') || id.includes('root')) return true;
+  
+  return false;
+}
+
+function elementToJSX(node: Node, depth: number = 0): string {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ? node.textContent.replace(/{/g, '{"{"}').replace(/}/g, '{"}"}') : '';
+    const text = node.textContent?.trim();
+    if (!text) return '';
+    return text.replace(/{/g, '{"{"}').replace(/}/g, '{"}"}');
   }
   if (node.nodeType === Node.COMMENT_NODE) {
     return `{/* ${node.textContent} */}`;
@@ -77,9 +100,8 @@ function elementToJSX(node: Node): string {
     if (name === 'style') {
       attributes.push(`${name}={${parseStyle(attr.value)}}`);
     } else if (name.startsWith('on')) {
-      // Preserve event handlers as data attributes for visibility, 
-      // though functional mapping requires manual wiring.
-      attributes.push(`data-${name}="${attr.value.replace(/"/g, '&quot;')}"`);
+      // Convert raw JS handlers to a generic call pattern
+      attributes.push(`${name}={() => console.log("${name} triggered")}`);
     } else {
       if (['disabled', 'checked', 'required', 'readOnly', 'hidden'].includes(name) && (attr.value === '' || attr.value === 'true')) {
         attributes.push(`${name}={true}`);
@@ -90,7 +112,7 @@ function elementToJSX(node: Node): string {
   }
 
   const children = Array.from(el.childNodes)
-    .map(child => elementToJSX(child))
+    .map(child => elementToJSX(child, depth + 1))
     .join('');
 
   const selfClosing = ['img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'param', 'source', 'track', 'wbr'].includes(tagName);
@@ -102,37 +124,38 @@ function elementToJSX(node: Node): string {
   return `<${tagName} ${attributes.join(' ')}>${children}</${tagName}>`;
 }
 
-export function convertToReactComponent(html: string, originalName: string = 'ManifestedApp'): string {
+export function convertToReactComponent(html: string, originalName: string = 'ManifestedApp', customCss: string = ''): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   
   const safeName = originalName.replace(/[^a-zA-Z0-9]/g, '') || 'ManifestedApp';
   
-  const styles = Array.from(doc.querySelectorAll('style'))
+  const styles = (customCss || Array.from(doc.querySelectorAll('style'))
     .map(s => s.textContent)
-    .join('\n');
+    .join('\n')).trim();
 
   const scripts = Array.from(doc.querySelectorAll('script'))
     .map(s => s.textContent)
     .join('\n');
 
   const body = doc.body;
-  const subComponents: { name: string, jsx: string }[] = [];
+  const subComponents: { name: string, jsx: string, stateful: boolean }[] = [];
   
-  // Strategy: Identify top-level semantic sections
-  const containers = body.querySelectorAll('header, main, footer, section, nav, aside');
-  const targets = containers.length > 0 
-    ? Array.from(containers).filter(c => c.parentElement === body)
-    : Array.from(body.children);
-
+  // High-fidelity pattern detection for component decomposition
+  const rootElements = Array.from(body.children).filter(el => el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE');
+  
   const mainJSXParts: string[] = [];
 
-  targets.forEach((el, index) => {
-    const baseName = el.tagName.toLowerCase();
-    const componentName = `${baseName.charAt(0).toUpperCase() + baseName.slice(1)}Section${index + 1}`;
-    const jsx = elementToJSX(el);
+  rootElements.forEach((el, index) => {
+    const htmlEl = el as HTMLElement;
+    const baseName = htmlEl.tagName.toLowerCase();
+    const id = htmlEl.id || `Block${index + 1}`;
+    const componentName = `${baseName.charAt(0).toUpperCase() + baseName.slice(1)}${toCamelCase(id).charAt(0).toUpperCase() + toCamelCase(id).slice(1)}`;
     
-    subComponents.push({ name: componentName, jsx });
+    const isStateful = htmlEl.querySelectorAll('button, input, select, textarea').length > 0;
+    const jsx = elementToJSX(htmlEl);
+    
+    subComponents.push({ name: componentName, jsx, stateful: isStateful });
     mainJSXParts.push(`<${componentName} />`);
   });
 
@@ -141,9 +164,17 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
   }
 
   const subComponentCode = subComponents.map(comp => `
-const ${comp.name} = () => (
-  ${comp.jsx}
-);
+/**
+ * ${comp.name} Sub-component
+ * ${comp.stateful ? 'Detected interactive elements - state management recommended.' : 'Static content block.'}
+ */
+const ${comp.name} = () => {
+  ${comp.stateful ? '// Example State Hooks\n  // const [isActive, setIsActive] = useState(false);' : ''}
+  
+  return (
+    ${comp.jsx}
+  );
+};
 `).join('\n');
 
   return `
@@ -151,8 +182,19 @@ import React, { useEffect, useState } from 'react';
 
 /**
  * ${safeName} Component
- * Automated React transmutation of manifested AI artifact.
+ * ---------------------------------------------------------
+ * Generated by Manifest Engine v2.1
+ * Includes automatic component structural inference and 
+ * interactive element state scaffolding.
  */
+
+/* Core Design System Tokens & Custom Styles */
+const GLOBAL_STYLES = \`
+${THEME_VARIABLES}
+
+/* Artifact-specific Styles */
+${styles}
+\`;
 
 ${subComponentCode}
 
@@ -161,25 +203,33 @@ export default function ${safeName}() {
 
   useEffect(() => {
     setIsMounted(true);
+    
+    /* 
+     * Transmuted Logic Engine
+     * The following block contains logic extracted from the original artifact.
+     * Consider refactoring these into React-native useEffects or event handlers.
+     */
     try {
-      // Injected Logic Engine
-      ${scripts ? scripts : '// No internal scripts detected'}
+      ${scripts ? scripts.split('\n').map(line => '      ' + line).join('\n') : '// No complex logic detected in artifact source.'}
     } catch (error) {
-      console.warn("[${safeName}] Initialization warning:", error);
+      console.error("[${safeName}] Lifecycle Logic Error:", error);
     }
   }, []);
 
   return (
     <div className="manifest-root min-h-screen bg-white">
-      <style dangerouslySetInnerHTML={{ __html: \`${styles.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\` }} />
+      {/* Dynamic Style Injection */}
+      <style dangerouslySetInnerHTML={{ __html: GLOBAL_STYLES }} />
       
-      <div className="manifest-content">
+      {/* Transmuted UI Architecture */}
+      <div className="manifest-content antialiased text-manifest-main bg-manifest-primary">
         ${mainJSXParts.join('\n        ')}
       </div>
 
+      {/* Mounting Overlay */}
       {!isMounted && (
-        <div className="fixed inset-0 bg-white flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="fixed inset-0 bg-white flex items-center justify-center z-[9999]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-manifest-accent"></div>
         </div>
       )}
     </div>

@@ -48,6 +48,7 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
     isPanMode,
     deviceMode,
     isLandscape,
+    isDragMode,
     showSplitView,
     activeSidePanel,
     isCopied,
@@ -59,6 +60,7 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
     onChangeDeviceMode,
     onToggleOrientation,
     onToggleSidePanel,
+    onToggleDragMode,
     onExportPdf,
     onExportReact,
     onExportHtml,
@@ -106,10 +108,12 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                         <ViewportControls 
                             scale={scale}
                             isPanMode={isPanMode}
+                            isDragMode={isDragMode}
                             onZoomIn={onZoomIn}
                             onZoomOut={onZoomOut}
                             onResetView={onResetView}
                             onTogglePanMode={onTogglePanMode}
+                            onToggleDragMode={onToggleDragMode}
                         />
 
                         <DeviceControls 

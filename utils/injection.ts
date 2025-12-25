@@ -4,19 +4,105 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export const THEME_VARIABLES = `/* Manifest Design System - Variable Architecture */
+:root {
+  /* HSL Base: Brand Identity */
+  --m-accent-h: 217;
+  --m-accent-s: 91%;
+  --m-accent-l: 60%;
+  
+  /* Semantic Brand Tokens */
+  --manifest-accent: hsl(var(--m-accent-h), var(--m-accent-s), var(--m-accent-l));
+  --manifest-accent-hover: hsl(var(--m-accent-h), var(--m-accent-s), calc(var(--m-accent-l) - 8%));
+  --manifest-accent-glow: hsla(var(--m-accent-h), var(--m-accent-s), var(--m-accent-l), 0.35);
+
+  /* Surface System (Light/Mixed) */
+  --manifest-bg-primary: #f8fafc;
+  --manifest-bg-secondary: #eff6ff;
+  --manifest-bg-tertiary: #f0fdf4;
+  --manifest-bg-card: #ffffff;
+  --manifest-border: #e2e8f0;
+
+  /* Typography System */
+  --manifest-text-main: #0f172a;
+  --manifest-text-sub: #475569;
+  --manifest-text-muted: #94a3b8;
+  --manifest-text-inverse: #ffffff;
+  
+  /* Layout Geometry */
+  --manifest-radius-sm: 0.375rem;
+  --manifest-radius-md: 0.75rem;
+  --manifest-radius-lg: 1rem;
+  --manifest-radius-xl: 1.5rem;
+  --manifest-radius-full: 9999px;
+
+  /* Standardized Spacing */
+  --manifest-space-1: 0.25rem;
+  --manifest-space-2: 0.5rem;
+  --manifest-space-3: 0.75rem;
+  --manifest-space-4: 1rem;
+  --manifest-space-6: 1.5rem;
+  --manifest-space-8: 2rem;
+  --manifest-space-12: 3rem;
+  
+  /* Animation Dynamics */
+  --manifest-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --manifest-duration: 0.2s;
+  --manifest-transition: var(--manifest-duration) var(--manifest-ease);
+
+  /* Elevation/Shadow System */
+  --manifest-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --manifest-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --manifest-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --manifest-shadow-active: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}`;
+
 export const SUBTLE_BACKGROUND_STYLE = `
-<style>
-  /* Injected background for better aesthetics - using :where(body) to keep specificity low */
-  :where(body) {
-    background: linear-gradient(300deg, #f8fafc, #eff6ff, #f0fdf4);
-    background-size: 200% 200%;
-    animation: gradient-animation 15s ease infinite;
-    min-height: 100vh;
-    margin: 0;
-    scroll-behavior: smooth;
+<style type="text/tailwindcss">
+  @layer base {
+    /* Modern CSS Reset */
+    *, ::before, ::after {
+      box-sizing: border-box;
+      border-width: 0;
+      border-style: solid;
+      border-color: var(--manifest-border, currentColor);
+    }
+
+    html {
+      line-height: 1.5;
+      -webkit-text-size-adjust: 100%;
+      -moz-tab-size: 4;
+      tab-size: 4;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+
+    body {
+      @apply bg-manifest-primary text-manifest-main antialiased min-h-screen m-0;
+      background: linear-gradient(300deg, var(--manifest-bg-primary), var(--manifest-bg-secondary), var(--manifest-bg-tertiary));
+      background-size: 200% 200%;
+      animation: manifest-gradient 15s var(--manifest-ease) infinite;
+    }
+
+    /* Media Reset */
+    img, svg, video, canvas, audio, iframe, embed, object {
+      display: block;
+      vertical-align: middle;
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Inherit fonts for form elements */
+    button, input, optgroup, select, textarea {
+      font-family: inherit;
+      font-size: 100%;
+      line-height: inherit;
+      color: inherit;
+      margin: 0;
+      padding: 0;
+    }
   }
 
-  @keyframes gradient-animation {
+  @keyframes manifest-gradient {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
@@ -25,130 +111,54 @@ export const SUBTLE_BACKGROUND_STYLE = `
 `;
 
 export const INTERACTIVE_STYLES = `
-<style>
-  /* -------------------------------------------------- */
-  /* ENHANCED INTERACTIVE SYSTEM                        */
-  /* -------------------------------------------------- */
-  
-  /* Smooth transitions for all potentially interactive elements */
-  button, 
-  a, 
-  input, 
-  select, 
-  textarea,
-  [role="button"],
-  .card,
-  section > div {
-    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+<style type="text/tailwindcss">
+  @layer components {
+    /* Semantic Interactive Classes mapped to System Variables */
+    button, .btn, .button, [role="button"] {
+      @apply cursor-pointer transition-all duration-200 select-none touch-manipulation;
+      border-radius: var(--manifest-radius-md);
+    }
+    
+    button:hover, .btn:hover {
+      @apply -translate-y-px brightness-105 shadow-manifest-md;
+    }
+
+    button:active, .btn:active {
+      @apply translate-y-px scale-[0.98] brightness-95 duration-75;
+      box-shadow: var(--manifest-shadow-active) !important;
+    }
+
+    a {
+      @apply text-manifest-accent transition-all duration-200;
+      text-decoration-color: transparent;
+    }
+    
+    a:hover {
+      @apply text-manifest-accent-hover;
+      text-decoration-color: currentColor;
+    }
+    
+    input, textarea, select {
+      @apply bg-manifest-card border-manifest-border transition-all duration-200;
+      border-width: 1px;
+      border-radius: var(--manifest-radius-sm);
+      padding: var(--manifest-space-2) var(--manifest-space-3);
+    }
+    
+    input:focus, textarea:focus, select:focus {
+      @apply outline-none ring-2 ring-manifest-accent ring-opacity-20 border-manifest-accent;
+    }
   }
 
-  /* Magnetic & Lift Effect for Buttons */
-  button, 
-  .btn, 
-  .button,
-  [role="button"],
-  input[type="submit"] {
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-  }
-
-  button:hover, 
-  .btn:hover, 
-  .button:hover,
-  [role="button"]:hover {
-    transform: translateY(-3px) scale(1.01);
-    box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.15);
-    filter: brightness(1.05);
-  }
-
-  button:active, 
-  .btn:active, 
-  .button:active {
-    transform: translateY(1px) scale(0.98);
-    transition-duration: 0.1s !important;
-  }
-
-  /* Subtle Pulse for Icons inside buttons */
-  button svg, 
-  .btn svg,
-  a svg {
-    transition: transform 0.3s ease;
-  }
-
-  button:hover svg, 
-  .btn:hover svg,
-  a:hover svg {
-    animation: subtle-pulse 2s infinite ease-in-out;
-  }
-
-  @keyframes subtle-pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.15); opacity: 0.8; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-
-  /* Reveal Animations for Sections */
-  main, section, article {
-    animation: reveal-up 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  /* Entrance Transitions */
+  main > *, section, .card {
+    animation: manifest-fade-in 0.7s var(--manifest-ease) forwards;
     opacity: 0;
   }
 
-  section:nth-child(1) { animation-delay: 0.1s; }
-  section:nth-child(2) { animation-delay: 0.2s; }
-  section:nth-child(3) { animation-delay: 0.3s; }
-  section:nth-child(4) { animation-delay: 0.4s; }
-
-  @keyframes reveal-up {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  /* Soft Glow for primary-looking elements */
-  .bg-blue-500:hover, 
-  .bg-indigo-600:hover,
-  button[class*="bg-"]:hover {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
-  }
-
-  /* Interactive Links */
-  a {
-    position: relative;
-    text-decoration: none;
-  }
-  
-  a:not([class*="bg-"]):after {
-    content: '';
-    position: absolute;
-    width: 0;
-    height: 1px;
-    bottom: -2px;
-    left: 0;
-    background-color: currentColor;
-    transition: width 0.3s ease;
-    opacity: 0.7;
-  }
-
-  a:not([class*="bg-"]):hover:after {
-    width: 100%;
-  }
-
-  /* Skeleton loading state shimmer for anything with .loading class */
-  .loading {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+  @keyframes manifest-fade-in {
+    from { opacity: 0; transform: translateY(var(--manifest-space-2)); filter: blur(4px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
   }
 </style>
 `;
@@ -156,67 +166,84 @@ export const INTERACTIVE_STYLES = `
 export const DRAG_SCRIPT = `
 <script>
   (function() {
-    let enabled = false;
+    let enabled = true; 
     let activeItem = null;
-    let initialX = 0;
-    let initialY = 0;
-    let xOffset = 0;
-    let yOffset = 0;
+    let initialX, initialY, xOffset = 0, yOffset = 0;
 
-    window.addEventListener('message', (event) => {
-      if (event.data === 'enable-drag') {
+    function setupDrag() {
+      const style = document.createElement('style');
+      style.innerHTML = \`
+        [data-manifest-drag="true"] * { cursor: grab !important; }
+        .manifest-dragging { 
+          cursor: grabbing !important; 
+          z-index: 99999 !important; 
+          transform: scale(1.02) !important; 
+          outline: 2px dashed var(--manifest-accent) !important; 
+          outline-offset: 4px !important; 
+          box-shadow: var(--manifest-shadow-lg) !important;
+          pointer-events: none;
+          will-change: transform;
+        }
+        .manifest-blueprint-highlight {
+          outline: 1.5px solid var(--manifest-accent-glow);
+          outline-offset: -1px;
+          transition: outline-color 0.2s ease;
+        }
+      \`;
+      document.head.appendChild(style);
+      document.body.setAttribute('data-manifest-drag', 'true');
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data === 'enable-drag') {
         enabled = true;
-        const style = document.createElement('style');
-        style.id = 'drag-mode-style';
-        style.innerHTML = '* { cursor: grab !important; user-select: none !important; } .dragging { cursor: grabbing !important; opacity: 0.9 !important; z-index: 99999 !important; transform: scale(1.02) !important; outline: 4px dashed #3b82f6 !important; outline-offset: 4px !important; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.6) !important; transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1) !important; }';
-        document.head.appendChild(style);
-      } else if (event.data === 'disable-drag') {
+        document.body.setAttribute('data-manifest-drag', 'true');
+      } else if (e.data === 'disable-drag') {
         enabled = false;
-        const style = document.getElementById('drag-mode-style');
-        if (style) style.remove();
-        document.body.style.cursor = '';
+        document.body.setAttribute('data-manifest-drag', 'false');
       }
     });
 
-    document.addEventListener('mousedown', dragStart);
-    document.addEventListener('mouseup', dragEnd);
-    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseover', (e) => {
+        if (!enabled) return;
+        const item = e.target.closest('div, section, button, img, p, h1, h2, h3, h4, h5, h6, a, span, .card');
+        if (item) item.classList.add('manifest-blueprint-highlight');
+    });
 
-    function dragStart(e) {
-      if (!enabled) return;
-      if (e.target === document.body || e.target === document.documentElement) return;
-      
-      activeItem = e.target;
-      
+    document.addEventListener('mouseout', (e) => {
+        const item = e.target.closest('div, section, button, img, p, h1, h2, h3, h4, h5, h6, a, span, .card');
+        if (item) item.classList.remove('manifest-blueprint-highlight');
+    });
+
+    document.addEventListener('mousedown', (e) => {
+      if (!enabled || e.target === document.body) return;
+      activeItem = e.target.closest('div, section, button, img, p, h1, h2, h3, h4, h5, h6, a, span, .card');
+      if (!activeItem) return;
+
       const style = window.getComputedStyle(activeItem);
-      const matrix = new (window.DOMMatrix || window.WebKitCSSMatrix)(style.transform);
+      const matrix = new DOMMatrixReadOnly(style.transform);
       xOffset = matrix.m41;
       yOffset = matrix.m42;
       
       initialX = e.clientX - xOffset;
       initialY = e.clientY - yOffset;
+      activeItem.classList.add('manifest-dragging');
+    });
 
-      if (activeItem) {
-        activeItem.classList.add('dragging');
-      }
-    }
-
-    function dragEnd(e) {
+    document.addEventListener('mousemove', (e) => {
       if (!activeItem) return;
-      activeItem.classList.remove('dragging');
+      e.preventDefault();
+      const currentX = e.clientX - initialX;
+      const currentY = e.clientY - initialY;
+      activeItem.style.transform = 'translate3d(' + currentX + 'px, ' + currentY + 'px, 0)';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (activeItem) activeItem.classList.remove('manifest-dragging');
       activeItem = null;
-    }
+    });
 
-    function drag(e) {
-      if (activeItem && enabled) {
-        e.preventDefault();
-        
-        const currentX = e.clientX - initialX;
-        const currentY = e.clientY - initialY;
-
-        activeItem.style.transform = "translate3d(" + currentX + "px, " + currentY + "px, 0)";
-      }
-    }
+    setupDrag();
   })();
 </script>
 `;

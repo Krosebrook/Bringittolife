@@ -3,41 +3,49 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { GoogleGenAI, Part, GenerateContentParameters } from "@google/genai";
+import { GoogleGenAI, Part } from "@google/genai";
 import { GeneratedImageResult } from "../types";
 
 const CONFIG = {
   MODELS: {
-    TEXT: 'gemini-3-pro-preview',
-    IMAGE: 'gemini-2.5-flash-image',
+    TEXT: 'gemini-3-pro-preview', // High-fidelity reasoning for code generation
+    IMAGE: 'gemini-2.5-flash-image', // Efficient image generation for seed concepts
   },
   GENERATION: {
-    temperature: 0.3, 
-    topP: 0.9,
+    temperature: 0.15, // Slightly lower for more deterministic code generation
+    topP: 0.95,
   }
 };
 
-const SYSTEM_INSTRUCTION = `You are a world-class AI Architect. 
-Return ONLY high-fidelity, interactive HTML5/Tailwind/VanillaJS code. 
-Must start with <!DOCTYPE html>. 
-No markdown markers unless strictly necessary. 
-No text before or after the code block. 
-Ensure accessibility (ARIA) and responsive design are built-in.`;
+const SYSTEM_INSTRUCTION = `You are a world-class AI Software Architect and UI/UX Designer. 
+Your goal is to manifest interactive, high-fidelity digital artifacts based on user inputs.
+
+TECHNICAL REQUIREMENTS:
+1. Return ONLY valid, self-contained HTML5 code.
+2. STYLING: Use Tailwind CSS utility classes exclusively for layout, spacing, typography, and responsive design.
+3. DESIGN SYSTEM: Incorporate custom Manifest variables where applicable (e.g., bg-manifest-primary, text-manifest-main, rounded-manifest-md).
+4. INTERACTION: Use Vanilla JavaScript for all logic and interactivity. No external libraries unless requested.
+5. ACCESSIBILITY: Use semantic HTML5 tags and appropriate ARIA attributes.
+6. FORMATTING: No markdown wrappers (\`\`\`html). Start directly with <!DOCTYPE html>.
+
+STYLE GUIDELINE:
+- Prefer clean, modern, and professional aesthetics.
+- Ensure the interface is responsive across desktop, tablet, and mobile.
+- If using <style> tags, use the @apply directive to map Tailwind utilities to custom classes.`;
 
 class GeminiService {
-  private ai: GoogleGenAI;
-
-  constructor() {
+  private getClient(): GoogleGenAI {
     const apiKey = process.env.API_KEY;
     if (!apiKey) throw new Error("API_KEY environment variable is not defined.");
-    this.ai = new GoogleGenAI({ apiKey });
+    return new GoogleGenAI({ apiKey });
   }
 
   async generateArtifact(prompt: string, fileBase64?: string, mimeType?: string): Promise<string> {
+    const ai = this.getClient();
     const parts = this.prepareParts(prompt, fileBase64, mimeType);
 
     try {
-      const response = await this.ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: CONFIG.MODELS.TEXT,
         contents: { parts },
         config: {
@@ -51,50 +59,43 @@ class GeminiService {
       return this.extractRobustHtml(raw);
     } catch (error) {
       console.error("[GeminiService] Content generation failed:", error);
-      throw new Error("The manifestation gateway timed out or rejected the request. Please verify your prompt or image clarity.");
+      throw new Error("The manifestation gateway rejected the request. Please verify your prompt or try a different approach.");
     }
   }
 
-  /**
-   * Multi-pass Heuristic HTML Extraction
-   * Handles conversational filler, malformed markdown, and fragments.
-   */
   private extractRobustHtml(text: string): string {
     const trimmed = text.trim();
     
-    // Pass 1: Standard Full Document
+    // Strategy 1: Look for full document
     const fullDocMatch = trimmed.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);
     if (fullDocMatch) return fullDocMatch[0];
 
-    // Pass 2: Root Tag Capture
+    // Strategy 2: Look for root html tag
     const htmlTagMatch = trimmed.match(/<html[\s\S]*?<\/html>/i);
     if (htmlTagMatch) return htmlTagMatch[0];
 
-    // Pass 3: Markdown Block Extraction
+    // Strategy 3: Clean markdown blocks if present
     const mdBlockMatch = trimmed.match(/```(?:html|xml)?\s*([\s\S]*?)\s*```/i);
     if (mdBlockMatch) return mdBlockMatch[1];
 
-    // Pass 4: Greedy Fragment Recovery
-    const fragmentMatch = trimmed.match(/<(head|body|div|section)[\s\S]*<\/\1>/i);
-    if (fragmentMatch) return fragmentMatch[0];
-
-    // Fallback: If it looks like code, return as-is
-    if (trimmed.includes('<') && trimmed.includes('>')) {
+    // Strategy 4: Heuristic fallback
+    if (trimmed.includes('<body') || trimmed.includes('<div')) {
       return trimmed;
     }
 
-    return "<!-- Error: Failed to extract artifact logic from model response. -->";
+    return "<!-- Error: Manifestation sequence failed to produce valid HTML. -->";
   }
 
   async generateStarterImage(prompt: string): Promise<GeneratedImageResult> {
+    const ai = this.getClient();
     try {
-      const response = await this.ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: CONFIG.MODELS.IMAGE,
-        contents: { parts: [{ text: `High fidelity UI concept or technical blueprint for: ${prompt}` }] }
+        contents: { parts: [{ text: `A professional, high-fidelity UI design concept or technical wireframe for: ${prompt}` }] }
       });
 
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-      if (!part?.inlineData) throw new Error("Image synthesis sequence failed.");
+      if (!part?.inlineData) throw new Error("Image synthesis failed.");
 
       return {
         base64: part.inlineData.data,
@@ -107,8 +108,8 @@ class GeminiService {
   }
 
   private prepareParts(prompt: string, fileBase64?: string, mimeType?: string): Part[] {
-    const prefix = "Analyze these visual/textual signals and manifest a high-fidelity digital artifact. Use Tailwind for styling and Vanilla JS for interactions. Semantic HTML5 is mandatory.";
-    const parts: Part[] = [{ text: prompt ? `${prefix}\n\nUser Request: ${prompt}` : prefix }];
+    const prefix = "Transmute this prompt and visual reference into a fully functional, high-fidelity digital artifact. Use Tailwind CSS for all styling.";
+    const parts: Part[] = [{ text: prompt ? `${prefix}\n\nUser Intent: ${prompt}` : prefix }];
     
     if (fileBase64 && mimeType) {
       parts.push({ inlineData: { data: fileBase64, mimeType } });

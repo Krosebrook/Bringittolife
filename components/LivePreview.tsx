@@ -14,6 +14,7 @@ import { ReferencePanel } from './live/ReferencePanel';
 import { SimulatorViewport } from './live/SimulatorViewport';
 import { useIframeContent } from '../hooks/useIframeContent';
 import { CssEditorPanel } from './live/CssEditorPanel';
+import { THEME_VARIABLES } from '../utils/injection';
 
 interface LivePreviewProps {
   creation: Creation | null;
@@ -25,12 +26,11 @@ interface LivePreviewProps {
 export type SidePanelType = 'reference' | 'css';
 
 export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, isFocused, onReset }) => {
-    const [loadingStep, setLoadingStep] = useState(0);
     const [showSplitView, setShowSplitView] = useState(false);
     const [activeSidePanel, setActiveSidePanel] = useState<SidePanelType>('reference');
     const [customCss, setCustomCss] = useState<string>("");
     const [isCopied, setIsCopied] = useState(false);
-    const [isDragMode, setIsDragMode] = useState(false);
+    const [isDragMode, setIsDragMode] = useState(true);
     const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
     const [isLandscape, setIsLandscape] = useState(false);
     
@@ -42,69 +42,82 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const srcDoc = useIframeContent(creation);
 
-    // Sync state for CSS updates
-    const syncCssToIframe = useCallback((css: string) => {
-      if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({ type: 'update-css', css }, '*');
-      }
-    }, []);
-
-    // Initial CSS Extraction
+    // Initial state setup on new creation
     useEffect(() => {
-        if (creation?.html) {
+        if (creation) {
+            // 1. Extract Artifact-specific CSS
             const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-            let initialCss = "";
+            let extractedCss = "";
             let match;
             while ((match = styleRegex.exec(creation.html)) !== null) {
-                initialCss += match[1].trim() + "\n\n";
+                extractedCss += match[1].trim() + "\n\n";
             }
-            setCustomCss(initialCss.trim());
-        } else {
-            setCustomCss("");
-        }
-    }, [creation?.id]);
+            
+            // Set user-editable CSS area (The "Artifact Layer")
+            setCustomCss(extractedCss.trim());
 
-    // Live Synchronizer (Throttled via React effect)
-    useEffect(() => {
-        syncCssToIframe(customCss);
-    }, [customCss, syncCssToIframe]);
+            // 2. Viewport & UI State Reset
+            if (creation.originalImage) {
+              setShowSplitView(true);
+              setActiveSidePanel('reference');
+            } else {
+              setShowSplitView(false);
+            }
 
-    // Cleanup and environment reset
-    useEffect(() => {
-        if (creation?.originalImage) {
-            setShowSplitView(true);
-            setActiveSidePanel('reference');
+            setIsDragMode(true);
+            setDeviceMode('desktop');
+            setIsLandscape(false);
+            resetView();
+            setIsPanMode(false);
         }
-        setIsDragMode(false);
-        setDeviceMode('desktop');
-        setIsLandscape(false);
-        resetView();
-        setIsPanMode(false);
     }, [creation?.id, resetView, setIsPanMode]);
 
-    const handleIframeLoad = () => {
+    // Push CSS changes to the "Artifact Layer" in the iframe for real-time morphing
+    useEffect(() => {
+      const timeout = setTimeout(() => {
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
+        }
+      }, 50);
+      return () => clearTimeout(timeout);
+    }, [customCss]);
+
+    const handleIframeLoad = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
             iframeRef.current.contentWindow.postMessage(isDragMode ? 'enable-drag' : 'disable-drag', '*');
-            syncCssToIframe(customCss);
+            iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
         }
-    };
+    }, [isDragMode, customCss]);
 
     const handleCopyCode = async () => {
         if (!creation?.html) return;
         try {
-            await navigator.clipboard.writeText(creation.html);
+            const styledHtml = creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`);
+            await navigator.clipboard.writeText(styledHtml);
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
         } catch (err) {
-            console.error('Clipboard copy failed:', err);
+            console.error('Copy failed:', err);
         }
+    };
+
+    const handleExportHtml = () => {
+      if (!creation) return;
+      const styledHtml = creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`);
+      downloadFile(styledHtml, `${creation.name}.html`, 'text/html');
+    };
+
+    const handleExportReact = () => {
+      if (!creation) return;
+      const reactCode = convertToReactComponent(creation.html, creation.name, customCss);
+      downloadFile(reactCode, `${creation.name}.tsx`);
     };
 
     return (
       <div className={`
-        fixed z-40 flex flex-col rounded-lg overflow-hidden border border-zinc-800 bg-[#0E0E10] shadow-2xl
+        fixed z-40 flex flex-col rounded-xl overflow-hidden border border-zinc-800 bg-[#0E0E10] shadow-2xl
         transition-all duration-700 cubic-bezier(0.2, 0.8, 0.2, 1)
-        ${isFocused ? 'inset-2 md:inset-4 opacity-100 scale-100' : 'top-1/2 left-1/2 w-[90%] h-[60%] -translate-x-1/2 -translate-y-1/2 opacity-0 scale-95 pointer-events-none'}
+        ${isFocused ? 'inset-2 md:inset-4 opacity-100 scale-100' : 'top-1/2 left-1/2 w-0 h-0 opacity-0 scale-90 pointer-events-none'}
       `}>
         <PreviewToolbar
           creation={creation}
@@ -133,17 +146,24 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
                   setShowSplitView(true);
               }
           }}
-          onToggleDragMode={() => { setIsDragMode(!isDragMode); setIsPanMode(false); }}
+          onToggleDragMode={() => {
+              const nextMode = !isDragMode;
+              setIsDragMode(nextMode);
+              setIsPanMode(false);
+              if (iframeRef.current?.contentWindow) {
+                  iframeRef.current.contentWindow.postMessage(nextMode ? 'enable-drag' : 'disable-drag', '*');
+              }
+          }}
           onExportPdf={() => iframeRef.current?.contentWindow?.print()}
           onExportJson={() => creation && downloadArtifact(creation, `artifact_${creation.id}.json`)}
-          onExportReact={() => creation && downloadFile(convertToReactComponent(creation.html, creation.name), `${creation.name}.tsx`)}
-          onExportHtml={() => creation && downloadFile(creation.html, `${creation.name}.html`, 'text/html')}
+          onExportReact={handleExportReact}
+          onExportHtml={handleExportHtml}
           onCopyCode={handleCopyCode}
         />
 
         <div className="relative w-full flex-1 bg-[#09090b] flex overflow-hidden">
           {isLoading ? (
-            <ManifestationLoading step={loadingStep} />
+            <ManifestationLoading step={0} />
           ) : creation ? (
             <>
               {showSplitView && (

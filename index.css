@@ -1,3 +1,13 @@
+
+/* Manifest Design System - Global Variables */
+:root {
+  --m-accent-h: 217;
+  --m-accent-s: 91%;
+  --m-accent-l: 60%;
+  --manifest-accent: hsl(var(--m-accent-h), var(--m-accent-s), var(--m-accent-l));
+  --manifest-accent-glow: hsla(var(--m-accent-h), var(--m-accent-s), var(--m-accent-l), 0.3);
+}
+
 /* Technical Dot Grid Background */
 .bg-dot-grid {
   background-size: 40px 40px;
@@ -11,4 +21,10 @@
 .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+}
+
+/* Theme-Aware Selection */
+::selection {
+  background-color: var(--manifest-accent-glow);
+  color: white;
 }

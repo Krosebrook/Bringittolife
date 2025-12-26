@@ -3,13 +3,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DeviceMode } from '../../types';
 
-/**
- * SUB-COMPONENT: EnvironmentOverlay
- * Provides a status layer above the artifact but below simulated hardware frames.
- */
 const EnvironmentOverlay: React.FC<{ isVisible: boolean }> = ({ isVisible }) => {
   if (!isVisible) return null;
   return (
@@ -21,28 +17,19 @@ const EnvironmentOverlay: React.FC<{ isVisible: boolean }> = ({ isVisible }) => 
   );
 };
 
-/**
- * SUB-COMPONENT: IframeRenderer
- * Provides the actual sandboxed rendering surface.
- */
 const IframeRenderer = React.forwardRef<HTMLIFrameElement, { srcDoc: string, onLoad: () => void }>(
   ({ srcDoc, onLoad }, ref) => (
     <iframe
       ref={ref}
       title="Manifestation Surface"
-      aria-label="Interactive interactive artifact"
       srcDoc={srcDoc}
-      className="w-full h-full bg-white"
+      className="w-full h-full bg-white transition-opacity duration-300"
       sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
       onLoad={onLoad}
     />
   )
 );
 
-/**
- * ROOT COMPONENT: SimulatorViewport
- * Manages the layout, device emulation frames, and pan/zoom transform logic.
- */
 export const SimulatorViewport: React.FC<{
   srcDoc: string;
   deviceMode: DeviceMode;
@@ -66,11 +53,18 @@ export const SimulatorViewport: React.FC<{
   iframeRef,
   onIframeLoad
 }) => {
-  
-  /**
-   * Helper: Hardware Emulation Sizing
-   * Returns Tailwind classes for standardized device breakpoints.
-   */
+  const [errors, setErrors] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handleMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'iframe-error') {
+        setErrors(prev => [...prev, e.data.msg].slice(-5));
+      }
+    };
+    window.addEventListener('message', handleMsg);
+    return () => window.removeEventListener('message', handleMsg);
+  }, []);
+
   const getDeviceSizing = () => {
     switch (deviceMode) {
       case 'mobile': return isLandscape ? 'w-[812px] h-[375px]' : 'w-[375px] h-[812px]';
@@ -88,29 +82,33 @@ export const SimulatorViewport: React.FC<{
       onMouseLeave={panHandlers.onMouseLeave}
       style={{ cursor: isPanMode ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
     >
-      {/* Transformation Container: Handles Pan & Zoom */}
       <div 
         className="absolute inset-0 flex items-center justify-center transition-transform duration-75 ease-out origin-center"
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
       >
-        {/* Device Environment Shell */}
         <div className={`
-          relative overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.6)] bg-white transition-all duration-500
+          relative overflow-hidden shadow-[0_60px_120px_-30px_rgba(0,0,0,0.7)] bg-white transition-all duration-500
           ${getDeviceSizing()}
-          ${deviceMode !== 'desktop' ? 'rounded-[3rem] border-[12px] border-zinc-900 ring-1 ring-zinc-800' : ''}
+          ${deviceMode !== 'desktop' ? 'rounded-[3rem] border-[12px] border-zinc-900 ring-4 ring-zinc-800/30' : ''}
         `}>
-          {/* Status Overlays */}
           <EnvironmentOverlay isVisible={isPanMode} />
-          
-          {/* Interaction Guard: Intercepts clicks during pan/drag operations */}
           {isPanMode && <div className="absolute inset-0 z-50 cursor-inherit bg-transparent" />}
           
-          {/* The Content Renderer */}
           <IframeRenderer 
             ref={iframeRef} 
             srcDoc={srcDoc} 
             onLoad={onIframeLoad} 
           />
+
+          {errors.length > 0 && (
+            <div className="absolute bottom-4 left-4 right-4 z-50 pointer-events-none">
+              <div className="bg-red-950/90 backdrop-blur-md border border-red-500/30 rounded-lg p-2 max-h-24 overflow-y-auto">
+                {errors.map((err, i) => (
+                  <p key={i} className="text-[10px] font-mono text-red-200 opacity-80 mb-1 leading-tight">⚠ {err}</p>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

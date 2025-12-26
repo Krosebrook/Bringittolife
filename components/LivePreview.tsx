@@ -14,7 +14,8 @@ import { ReferencePanel } from './live/ReferencePanel';
 import { SimulatorViewport } from './live/SimulatorViewport';
 import { useIframeContent } from '../hooks/useIframeContent';
 import { CssEditorPanel } from './live/CssEditorPanel';
-import { THEME_VARIABLES } from '../utils/injection';
+import { ChatPanel } from './live/ChatPanel';
+import { useCreation } from '../hooks/useCreation';
 
 interface LivePreviewProps {
   creation: Creation | null;
@@ -23,17 +24,31 @@ interface LivePreviewProps {
   onReset: () => void;
 }
 
-export type SidePanelType = 'reference' | 'css';
+export type SidePanelType = 'reference' | 'css' | 'chat';
 
-export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, isFocused, onReset }) => {
+export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation, isLoading: propIsLoading, isFocused, onReset }) => {
     const [showSplitView, setShowSplitView] = useState(false);
-    const [activeSidePanel, setActiveSidePanel] = useState<SidePanelType>('reference');
+    const [activeSidePanel, setActiveSidePanel] = useState<SidePanelType>('chat');
     const [customCss, setCustomCss] = useState<string>("");
     const [isCopied, setIsCopied] = useState(false);
-    const [isDragMode, setIsDragMode] = useState(true);
+    const [isDragMode, setIsDragMode] = useState(false);
     const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
     const [isLandscape, setIsLandscape] = useState(false);
-    
+
+    const { 
+      activeCreation: internalCreation, 
+      isGenerating: internalIsLoading, 
+      isListening,
+      persona,
+      refine,
+      toggleVoiceMode,
+      updateTheme,
+      changePersona
+    } = useCreation(() => {});
+
+    const creation = internalCreation || propCreation;
+    const isLoading = internalIsLoading || propIsLoading;
+
     const { 
         scale, pan, isPanMode, isDragging, setIsPanMode, 
         zoomIn, zoomOut, resetView, panHandlers 
@@ -42,75 +57,70 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const srcDoc = useIframeContent(creation);
 
-    // Initial state setup on new creation
+    // Initial style extraction for the editor
     useEffect(() => {
         if (creation) {
-            // 1. Extract Artifact-specific CSS
             const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
             let extractedCss = "";
             let match;
             while ((match = styleRegex.exec(creation.html)) !== null) {
                 extractedCss += match[1].trim() + "\n\n";
             }
-            
-            // Set user-editable CSS area (The "Artifact Layer")
             setCustomCss(extractedCss.trim());
-
-            // 2. Viewport & UI State Reset
-            if (creation.originalImage) {
+            
+            if (creation.originalImage && !showSplitView && !internalCreation) {
               setShowSplitView(true);
               setActiveSidePanel('reference');
-            } else {
-              setShowSplitView(false);
             }
-
-            setIsDragMode(true);
-            setDeviceMode('desktop');
-            setIsLandscape(false);
-            resetView();
-            setIsPanMode(false);
         }
-    }, [creation?.id, resetView, setIsPanMode]);
+    }, [creation?.id]);
 
-    // Push CSS changes to the "Artifact Layer" in the iframe for real-time morphing
+    /**
+     * LAYER 5 SYNC: User Custom Styles
+     * Direct postMessage sync for hot-reloading user patches.
+     */
     useEffect(() => {
-      const timeout = setTimeout(() => {
+      const updateTimer = setTimeout(() => {
         if (iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
         }
-      }, 50);
-      return () => clearTimeout(timeout);
+      }, 50); // Debounce to prevent Tailwind thrashing
+      return () => clearTimeout(updateTimer);
     }, [customCss]);
+
+    /**
+     * LAYER 3 SYNC: HSL Theme Variables
+     * Syncs the brand identity values across the design system.
+     */
+    useEffect(() => {
+      if (creation?.theme && iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({ 
+          type: 'update-theme', 
+          ...creation.theme 
+        }, '*');
+      }
+    }, [creation?.theme]);
 
     const handleIframeLoad = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.postMessage(isDragMode ? 'enable-drag' : 'disable-drag', '*');
+            // Re-sync all layers on fresh iframe load
+            iframeRef.current.contentWindow.postMessage({ command: isDragMode ? 'enable-drag' : 'disable-drag' }, '*');
             iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
+            if (creation?.theme) {
+              iframeRef.current.contentWindow.postMessage({ type: 'update-theme', ...creation.theme }, '*');
+            }
         }
-    }, [isDragMode, customCss]);
+    }, [isDragMode, customCss, creation?.theme]);
 
     const handleCopyCode = async () => {
         if (!creation?.html) return;
         try {
+            // Merge custom patches back into head for distribution
             const styledHtml = creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`);
             await navigator.clipboard.writeText(styledHtml);
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
-        } catch (err) {
-            console.error('Copy failed:', err);
-        }
-    };
-
-    const handleExportHtml = () => {
-      if (!creation) return;
-      const styledHtml = creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`);
-      downloadFile(styledHtml, `${creation.name}.html`, 'text/html');
-    };
-
-    const handleExportReact = () => {
-      if (!creation) return;
-      const reactCode = convertToReactComponent(creation.html, creation.name, customCss);
-      downloadFile(reactCode, `${creation.name}.tsx`);
+        } catch (err) { console.error(err); }
     };
 
     return (
@@ -139,30 +149,24 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
           onToggleOrientation={() => setIsLandscape(!isLandscape)}
           onToggleSplitView={() => setShowSplitView(!showSplitView)}
           onToggleSidePanel={(type) => {
-              if (activeSidePanel === type && showSplitView) {
-                  setShowSplitView(false);
-              } else {
-                  setActiveSidePanel(type);
-                  setShowSplitView(true);
-              }
+              if (activeSidePanel === type && showSplitView) setShowSplitView(false);
+              else { setActiveSidePanel(type); setShowSplitView(true); }
           }}
           onToggleDragMode={() => {
               const nextMode = !isDragMode;
               setIsDragMode(nextMode);
               setIsPanMode(false);
-              if (iframeRef.current?.contentWindow) {
-                  iframeRef.current.contentWindow.postMessage(nextMode ? 'enable-drag' : 'disable-drag', '*');
-              }
+              if (iframeRef.current?.contentWindow) iframeRef.current.contentWindow.postMessage({ command: nextMode ? 'enable-drag' : 'disable-drag' }, '*');
           }}
           onExportPdf={() => iframeRef.current?.contentWindow?.print()}
           onExportJson={() => creation && downloadArtifact(creation, `artifact_${creation.id}.json`)}
-          onExportReact={handleExportReact}
-          onExportHtml={handleExportHtml}
+          onExportReact={() => creation && downloadFile(convertToReactComponent(creation.html, creation.name, customCss), `${creation.name}.tsx`)}
+          onExportHtml={() => creation && downloadFile(creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`), `${creation.name}.html`, 'text/html')}
           onCopyCode={handleCopyCode}
         />
 
         <div className="relative w-full flex-1 bg-[#09090b] flex overflow-hidden">
-          {isLoading ? (
+          {isLoading && !creation ? (
             <ManifestationLoading step={0} />
           ) : creation ? (
             <>
@@ -170,7 +174,22 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation, isLoading, i
                   activeSidePanel === 'reference' && creation.originalImage ? (
                     <ReferencePanel image={creation.originalImage} />
                   ) : activeSidePanel === 'css' ? (
-                    <CssEditorPanel css={customCss} onChange={setCustomCss} />
+                    <CssEditorPanel 
+                      css={customCss} 
+                      theme={creation.theme}
+                      onChange={setCustomCss} 
+                      onThemeChange={updateTheme}
+                    />
+                  ) : activeSidePanel === 'chat' ? (
+                    <ChatPanel 
+                      history={creation.chatHistory || []} 
+                      onSendMessage={(text) => refine(text)} 
+                      isLoading={isLoading} 
+                      isListening={isListening}
+                      onToggleVoice={toggleVoiceMode}
+                      persona={creation.persona || persona}
+                      onPersonaChange={changePersona}
+                    />
                   ) : null
               )}
               <SimulatorViewport 

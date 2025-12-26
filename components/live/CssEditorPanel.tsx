@@ -3,285 +3,125 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useState, useEffect, useRef } from 'react';
-import { SwatchIcon, ExclamationTriangleIcon, CheckCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
-
-interface CssError {
-  line: number;
-  message: string;
-  severity: 'error' | 'warning';
-  id: string;
-}
+import React, { useState, useEffect } from 'react';
+import { SparklesIcon, AdjustmentsHorizontalIcon, CodeBracketIcon } from '@heroicons/react/24/outline';
+import { ThemeState } from '../../types';
 
 interface CssEditorPanelProps {
   css: string;
+  theme?: ThemeState;
   onChange: (newCss: string) => void;
+  onThemeChange: (theme: ThemeState) => void;
 }
 
-export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, onChange }) => {
-  const [errors, setErrors] = useState<CssError[]>([]);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const prevErrorCount = useRef(0);
+export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: propTheme, onChange, onThemeChange }) => {
+  const [mode, setMode] = useState<'code' | 'visual'>('code');
+  const localTheme = propTheme || { h: 217, s: 91, l: 60 };
 
-  // Real-time CSS Validation Logic
   useEffect(() => {
-    const validateCss = () => {
-      const newErrors: CssError[] = [];
-      const lines = css.split('\n');
-      
-      // 1. Structural Checks
-      const openBraces = (css.match(/{/g) || []).length;
-      const closeBraces = (css.match(/}/g) || []).length;
-
-      if (openBraces > closeBraces) {
-        newErrors.push({ 
-          id: 'brace-missing',
-          line: -1, 
-          message: `Unclosed block: Expected ${openBraces - closeBraces} more '}'`, 
-          severity: 'error' 
-        });
-      } else if (closeBraces > openBraces) {
-        newErrors.push({ 
-          id: 'brace-extra',
-          line: -1, 
-          message: `Unexpected '}': Found ${closeBraces - openBraces} extra brace(s)`, 
-          severity: 'error' 
-        });
-      }
-
-      // 2. Semantic & Syntax Heuristics
-      let inBlock = false;
-      const seenProperties = new Set<string>();
-
-      lines.forEach((line, index) => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('/*')) return;
-
-        // Block Tracking
-        if (trimmed.includes('{')) {
-          inBlock = true;
-          seenProperties.clear();
-        }
-        if (trimmed.includes('}')) {
-          inBlock = false;
-          seenProperties.clear();
-        }
-
-        // Property-Value Validation
-        if (inBlock && trimmed.includes(':')) {
-          const colonIndex = trimmed.indexOf(':');
-          const property = trimmed.substring(0, colonIndex).trim();
-          const valueWithSemi = trimmed.substring(colonIndex + 1).trim();
-          const value = valueWithSemi.replace(/;$/, '').trim();
-
-          // Check: Duplicate Properties
-          if (property && seenProperties.has(property)) {
-            newErrors.push({
-              id: `dup-${index}`,
-              line: index + 1,
-              message: `Duplicate property: "${property}" is already defined in this block`,
-              severity: 'warning'
-            });
-          }
-          if (property) seenProperties.add(property);
-
-          // Check: Missing Semicolon
-          if (!trimmed.endsWith(';') && !trimmed.endsWith('{') && !trimmed.endsWith('}')) {
-             newErrors.push({ 
-               id: `semi-${index}`,
-               line: index + 1, 
-               message: `Missing semicolon after property value`, 
-               severity: 'warning' 
-             });
-          }
-
-          // Check: CSS standard support
-          if (property && !property.startsWith('--')) {
-            // Validate property existence
-            const isValidProp = CSS.supports(property, 'inherit');
-            if (!isValidProp) {
-              newErrors.push({
-                id: `prop-inv-${index}`,
-                line: index + 1,
-                message: `Unknown property: "${property}"`,
-                severity: 'warning'
-              });
-            } else if (value && !CSS.supports(property, value)) {
-              // Validate value compatibility
-              newErrors.push({
-                id: `val-inv-${index}`,
-                line: index + 1,
-                message: `Invalid value "${value}" for "${property}"`,
-                severity: 'warning'
-              });
-            }
-          }
-        }
-
-        // Check: Naked selectors (Heuristic)
-        if (!inBlock && trimmed.length > 0 && !trimmed.includes('{') && !trimmed.includes('}') && !trimmed.startsWith('@') && !trimmed.startsWith('/') && !trimmed.includes(':')) {
-           // Might be a selector split across lines or just a floating string
-           if (index < lines.length - 1 && !lines[index+1].trim().startsWith('{')) {
-             newErrors.push({
-               id: `select-err-${index}`,
-               line: index + 1,
-               message: `Selector might be missing an opening brace '{'`,
-               severity: 'warning'
-             });
-           }
-        }
-      });
-
-      setErrors(newErrors);
-      
-      // Trigger subtle shake animation if errors increased
-      if (newErrors.length > prevErrorCount.current) {
-        setIsAnimating(true);
-        setTimeout(() => setIsAnimating(false), 500);
-      }
-      prevErrorCount.current = newErrors.length;
-    };
-
-    const debounce = setTimeout(validateCss, 250);
-    return () => clearTimeout(debounce);
-  }, [css]);
-
-  const hasCriticalErrors = errors.some(e => e.severity === 'error');
+    const themeVarBlock = `
+:root {
+  --m-accent-h: ${localTheme.h};
+  --m-accent-s: ${localTheme.s}%;
+  --m-accent-l: ${localTheme.l}%;
+}
+`.trim();
+    
+    if (css.includes('/* THEME_STUDIO_START */')) {
+      const newCss = css.replace(
+        /\/\* THEME_STUDIO_START \*\/[\s\S]*?\/\* THEME_STUDIO_END \*\//,
+        `/* THEME_STUDIO_START */\n${themeVarBlock}\n/* THEME_STUDIO_END */`
+      );
+      if (newCss !== css) onChange(newCss);
+    } else {
+      onChange(`/* THEME_STUDIO_START */\n${themeVarBlock}\n/* THEME_STUDIO_END */\n\n${css}`);
+    }
+  }, [localTheme.h, localTheme.s, localTheme.l]);
 
   return (
-    <div className={`w-full md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r transition-all duration-500 flex flex-col shrink-0 ${hasCriticalErrors ? 'border-red-900/50 bg-[#0f0909]' : 'border-zinc-800 bg-[#0c0c0e]'}`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-[#121214] z-10">
-        <div className="flex items-center space-x-2">
-          <SwatchIcon className={`w-4 h-4 transition-colors duration-500 ${hasCriticalErrors ? 'text-red-500' : 'text-blue-500'}`} />
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">Morphing Engine</span>
+    <div className="w-full md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-zinc-800 bg-[#0c0c0e] flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-[#121214]">
+        <div className="flex items-center space-x-4">
+          <button 
+            onClick={() => setMode('code')}
+            className={`flex items-center space-x-2 text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded transition-colors ${mode === 'code' ? 'text-blue-400 bg-blue-400/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <CodeBracketIcon className="w-3.5 h-3.5" />
+            <span>Code</span>
+          </button>
+          <button 
+            onClick={() => setMode('visual')}
+            className={`flex items-center space-x-2 text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded transition-colors ${mode === 'visual' ? 'text-amber-400 bg-amber-400/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <AdjustmentsHorizontalIcon className="w-3.5 h-3.5" />
+            <span>Theme Studio</span>
+          </button>
         </div>
-        
-        <div className="flex items-center space-x-3">
-           {errors.length > 0 ? (
-             <div className={`flex items-center space-x-1.5 ${isAnimating ? 'animate-shake' : ''}`}>
-                <ExclamationTriangleIcon className={`w-3.5 h-3.5 ${hasCriticalErrors ? 'text-red-500' : 'text-amber-500'}`} />
-                <span className={`text-[10px] font-mono uppercase font-bold tracking-tight ${hasCriticalErrors ? 'text-red-500' : 'text-amber-500'}`}>
-                  {errors.length} {errors.length === 1 ? 'Diagnostic' : 'Diagnostics'}
-                </span>
-             </div>
-           ) : (
-             <div className="flex items-center space-x-1.5 text-emerald-500 animate-in fade-in duration-700">
-                <CheckCircleIcon className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-mono uppercase font-bold tracking-tight">System Ready</span>
-             </div>
-           )}
-           <div className="h-3 w-px bg-zinc-800"></div>
-           <SparklesIcon className={`w-3.5 h-3.5 ${css.length > 0 ? 'text-blue-400 animate-pulse' : 'text-zinc-700'}`} />
-        </div>
+        <SparklesIcon className="w-4 h-4 text-blue-500" />
       </div>
 
-      <div className="flex-1 relative group">
-        {/* Line Highlighting Gutter */}
-        <div className="absolute left-0 top-0 bottom-0 w-1 pointer-events-none z-10 bg-zinc-900/20">
-          {errors.filter(e => e.line > 0).map((err) => (
-            <div 
-              key={err.id}
-              className={`absolute left-0 w-1 transition-all duration-300 ${err.severity === 'error' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-amber-500/60'}`}
-              style={{ top: `${(err.line - 1) * 1.25}rem`, height: '1.25rem' }} 
-              title={err.message}
-            />
-          ))}
-        </div>
+      <div className="flex-1 relative overflow-hidden bg-[#0c0c0e]">
+        {mode === 'code' ? (
+          <textarea
+            value={css}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full h-full p-6 bg-transparent font-mono text-sm text-zinc-300 resize-none focus:outline-none"
+            spellCheck={false}
+          />
+        ) : (
+          <div className="p-8 space-y-8 animate-in fade-in zoom-in-95">
+            <h4 className="text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-4">Brand Color Synthesis</h4>
+            
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                  <span>Hue Shift</span>
+                  <span className="text-blue-400">{localTheme.h}°</span>
+                </div>
+                <input 
+                  type="range" min="0" max="360" value={localTheme.h} 
+                  onChange={(e) => onThemeChange({...localTheme, h: parseInt(e.target.value)})}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
 
-        <textarea
-          value={css}
-          onChange={(e) => onChange(e.target.value)}
-          className={`
-            absolute inset-0 w-full h-full p-6 bg-transparent font-mono text-sm resize-none 
-            focus:outline-none focus:ring-0 custom-scrollbar transition-colors duration-500
-            ${hasCriticalErrors ? 'text-red-100/80' : 'text-zinc-300'}
-          `}
-          placeholder="/* Overwrite styles here. Use CSS variables or raw selectors. */"
-          spellCheck={false}
-          style={{ lineHeight: '1.25rem' }}
-        />
+              <div className="space-y-3">
+                <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                  <span>Saturation</span>
+                  <span className="text-blue-400">{localTheme.s}%</span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" value={localTheme.s} 
+                  onChange={(e) => onThemeChange({...localTheme, s: parseInt(e.target.value)})}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
 
-        {/* Dynamic Diagnostics HUD */}
-        {errors.length > 0 && (
-          <div className={`
-            absolute bottom-6 right-6 max-w-[300px] bg-[#121214]/95 backdrop-blur-xl border border-zinc-800 
-            rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-20 transition-all duration-300
-            ${isAnimating ? 'animate-bounce-subtle' : ''}
-            group-hover:opacity-10 group-hover:translate-y-2 group-hover:pointer-events-none
-          `}>
-            <div className="px-4 py-2.5 border-b border-zinc-800 bg-zinc-900/40 flex items-center justify-between">
-              <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Diagnostics</span>
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500/20"></div>
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500/20"></div>
+              <div className="space-y-3">
+                <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                  <span>Luminosity</span>
+                  <span className="text-blue-400">{localTheme.l}%</span>
+                </div>
+                <input 
+                  type="range" min="10" max="90" value={localTheme.l} 
+                  onChange={(e) => onThemeChange({...localTheme, l: parseInt(e.target.value)})}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
               </div>
             </div>
-            <div className="p-4 space-y-3 max-h-56 overflow-y-auto custom-scrollbar">
-              {errors.map((err) => (
-                <div key={err.id} className="flex gap-3 items-start animate-in slide-in-from-right-2 duration-300">
-                  <div className={`mt-1.5 shrink-0 w-2 h-2 rounded-full ring-2 ring-offset-2 ring-offset-[#121214] ${err.severity === 'error' ? 'bg-red-500 ring-red-500/20' : 'bg-amber-500 ring-amber-500/20'}`} />
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[11px] text-zinc-200 font-medium leading-tight">{err.message}</span>
-                    {err.line > 0 && (
-                      <span className="text-[9px] text-zinc-500 font-mono font-bold">
-                        Line {err.line}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+
+            <div className="pt-8">
+              <div 
+                className="w-full h-32 rounded-3xl shadow-2xl border border-white/5 flex flex-col items-center justify-center text-white space-y-2"
+                style={{ backgroundColor: `hsl(${localTheme.h}, ${localTheme.s}%, ${localTheme.l}%)` }}
+              >
+                <div className="text-[10px] font-mono opacity-50 uppercase tracking-[0.2em]">Sample Artifact Color</div>
+                <div className="text-xl font-bold font-mono">#{localTheme.h} {localTheme.s}% {localTheme.l}%</div>
+              </div>
             </div>
           </div>
         )}
       </div>
-
-      <div className="px-4 py-3 border-t border-zinc-800 bg-[#09090b] flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-4">
-            <span className={`text-[10px] font-mono transition-colors duration-500 ${hasCriticalErrors ? 'text-red-500' : 'text-zinc-600'}`}>
-                {hasCriticalErrors ? 'Validation Blocked' : 'Hot-Reload Active'}
-            </span>
-            <div className={`h-1.5 w-1.5 rounded-full ${hasCriticalErrors ? 'bg-red-500 animate-pulse' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'}`}></div>
-        </div>
-        <button 
-          onClick={() => onChange("")}
-          className="text-[10px] text-zinc-500 hover:text-white transition-all uppercase font-black tracking-widest px-2 py-1 rounded hover:bg-zinc-800"
-        >
-          Purge Editor
-        </button>
-      </div>
-
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #1f1f23;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #2d2d33;
-        }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-4px); }
-          75% { transform: translateX(4px); }
-        }
-        .animate-shake {
-          animation: shake 0.2s ease-in-out 2;
-        }
-
-        @keyframes bounce-subtle {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
-        }
-        .animate-bounce-subtle {
-          animation: bounce-subtle 0.5s ease-in-out 1;
-        }
-      `}</style>
     </div>
   );
 };

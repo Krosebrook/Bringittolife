@@ -5,15 +5,39 @@
  */
 
 export type ArtifactType = 'app' | 'game' | 'utility' | 'dashboard';
-
 export type DeviceMode = 'desktop' | 'tablet' | 'mobile';
+
+export type DesignPersona = 'modernist' | 'brutalist' | 'accessible' | 'playful' | 'enterprise';
+
+export interface GroundingSource {
+  title?: string;
+  uri: string;
+  snippet?: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: Date;
+  grounding?: GroundingSource[];
+  isVoiceInput?: boolean;
+}
+
+export interface ThemeState {
+  h: number;
+  s: number;
+  l: number;
+}
 
 export interface Creation {
   id: string;
   name: string;
   html: string;
-  originalImage?: string; // Base64 data URL
+  originalImage?: string; 
   timestamp: Date;
+  chatHistory?: ChatMessage[];
+  theme?: ThemeState;
+  persona?: DesignPersona;
   metadata?: {
     type?: ArtifactType;
     prompt?: string;
@@ -21,15 +45,14 @@ export interface Creation {
   };
 }
 
-export interface GeneratedImageResult {
-  base64: string;
-  mimeType: string;
-}
-
 export interface GenerationState {
   isLoading: boolean;
+  isListening: boolean;
   error: string | null;
   progressStep: number;
 }
 
-export type MimeType = 'image/png' | 'image/jpeg' | 'image/webp' | 'application/pdf';
+export interface GeneratedImageResult {
+  base64: string;
+  mimeType: string;
+}

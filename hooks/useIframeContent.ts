@@ -8,18 +8,17 @@ import { Creation } from '../types';
 import { INTERACTIVE_STYLES, SUBTLE_BACKGROUND_STYLE, THEME_VARIABLES, DRAG_SCRIPT } from '../utils/injection';
 
 /**
- * Assembles the base document structure for the preview sandbox.
- * Focuses on establishing a robust CSS cascade where user overrides 
- * (Layer 2) have ultimate priority over system foundations (Layer 1).
+ * HIGH-PRECEDENCE IFRAME ARCHITECT
+ * Manages the transition from machine-generated HTML to a fully customizable,
+ * Tailwind-powered Design System.
  */
-const assembleIframeDoc = (rawHtml: string, initialCss: string): string => {
-  // Extract body and strip inline style tags to prevent collision with the Morphing Engine
-  const bodyContent = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
+const assembleIframeDoc = (rawHtml: string, artifactCss: string): string => {
+  // Purge existing styles from raw HTML to centralize design control in the layers
+  const cleanedHtml = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
   
   const headInjections = [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    '<!-- Engine Foundation -->',
     '<script src="https://cdn.tailwindcss.com"></script>',
     '<script>',
     '  tailwind.config = {',
@@ -28,8 +27,8 @@ const assembleIframeDoc = (rawHtml: string, initialCss: string): string => {
     '      extend: {',
     '        colors: { ',
     '          manifest: { ',
-    '            accent: "var(--manifest-accent)", ',
-    '            "accent-hover": "var(--manifest-accent-hover)",',
+    '            accent: "hsl(var(--m-accent-h) var(--m-accent-s) var(--m-accent-l) / <alpha-value>)", ',
+    '            "accent-hover": "hsl(var(--m-accent-h) var(--m-accent-s) calc(var(--m-accent-l) - 8%) / <alpha-value>)",',
     '            primary: "var(--manifest-bg-primary)",',
     '            secondary: "var(--manifest-bg-secondary)",',
     '            tertiary: "var(--manifest-bg-tertiary)",',
@@ -41,87 +40,76 @@ const assembleIframeDoc = (rawHtml: string, initialCss: string): string => {
     '            inverse: "var(--manifest-text-inverse)"',
     '          } ',
     '        },',
-    '        borderRadius: { ',
-    '          "manifest-sm": "var(--manifest-radius-sm)",',
-    '          "manifest-md": "var(--manifest-radius-md)", ',
-    '          "manifest-lg": "var(--manifest-radius-lg)",',
-    '          "manifest-xl": "var(--manifest-radius-xl)"',
-    '        },',
-    '        spacing: {',
-    '          "manifest-1": "var(--manifest-space-1)",',
-    '          "manifest-2": "var(--manifest-space-2)",',
-    '          "manifest-3": "var(--manifest-space-3)",',
-    '          "manifest-4": "var(--manifest-space-4)",',
-    '          "manifest-6": "var(--manifest-space-6)",',
-    '          "manifest-8": "var(--manifest-space-8)",',
-    '          "manifest-12": "var(--manifest-space-12)"',
-    '        },',
-    '        boxShadow: {',
-    '          "manifest-sm": "var(--manifest-shadow-sm)",',
-    '          "manifest-md": "var(--manifest-shadow-md)",',
-    '          "manifest-lg": "var(--manifest-shadow-lg)"',
-    '        },',
-    '        transitionTimingFunction: {',
-    '          "manifest-ease": "var(--manifest-ease)"',
+    '        animation: {',
+    '          "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",',
     '        }',
     '      }',
     '    }',
     '  }',
     '</script>',
     
-    '<!-- Layer 1: Manifest System Base (Overridable) -->',
-    `<style type="text/tailwindcss" id="manifest-system-foundation">`,
-    `@tailwind base; @tailwind components; @tailwind utilities;`,
-    THEME_VARIABLES,
-    SUBTLE_BACKGROUND_STYLE.replace(/<style[^>]*>|<\/style>/g, ''),
-    INTERACTIVE_STYLES.replace(/<style[^>]*>|<\/style>/g, ''),
-    '</style>',
+    '<!-- Layer 1: Global Design Tokens -->',
+    `<style id="layer-variables">${THEME_VARIABLES}</style>`,
     
-    '<!-- Layer 2: Artifact Overrides (Highest Priority) -->',
-    `<style type="text/tailwindcss" id="manifest-artifact-styles">`,
-    initialCss,
-    '</style>',
+    '<!-- Layer 2: Theme Foundation & Base Transitions -->',
+    SUBTLE_BACKGROUND_STYLE,
+    INTERACTIVE_STYLES,
+
+    '<!-- Layer 3: Theme Studio (Dynamic HSL Injection) -->',
+    `<style id="layer-theme-studio"></style>`,
+
+    '<!-- Layer 4: Original Artifact Styles -->',
+    `<style type="text/tailwindcss" id="layer-artifact">${artifactCss}</style>`,
+
+    '<!-- Layer 5: High-Priority User Patch (The Master Override) -->',
+    `<style type="text/tailwindcss" id="layer-user-patch"></style>`,
 
     `<script>
-      // Real-time CSS Hot-Reloading
+      // Runtime Style Synchronization Bridge
       window.addEventListener('message', (event) => {
-        if (event.data?.type === 'update-css') {
-          const artifactStyleTag = document.getElementById('manifest-artifact-styles');
-          if (artifactStyleTag) {
-            artifactStyleTag.innerHTML = event.data.css;
-          }
+        const { type, css, h, s, l, command } = event.data || {};
+        
+        if (type === 'update-css') {
+          const patchLayer = document.getElementById('layer-user-patch');
+          if (patchLayer) patchLayer.innerHTML = css;
         }
-        // State updates for UI tools
-        if (event.data === 'enable-drag' || event.data === 'disable-drag') {
-          window.dispatchEvent(new MessageEvent('message', { data: event.data }));
+        
+        if (type === 'update-theme') {
+          const themeLayer = document.getElementById('layer-theme-studio');
+          if (themeLayer) {
+            themeLayer.innerHTML = \`
+              :root {
+                --m-accent-h: \${h};
+                --m-accent-s: \${s}%;
+                --m-accent-l: \${l}%;
+              }\`;
+          }
         }
       });
     </script>`,
     DRAG_SCRIPT 
   ].join('\n    ');
 
-  // Ensure head injections are placed properly to maintain cascade priority
-  if (bodyContent.toLowerCase().includes('</head>')) {
-    return bodyContent.replace(/<\/head>/i, `${headInjections}\n</head>`);
+  // Insert injections into head, ensuring they are the last thing in head for maximum specificity
+  if (cleanedHtml.toLowerCase().includes('</head>')) {
+    return cleanedHtml.replace(/<\/head>/i, `${headInjections}\n</head>`);
   }
   
-  return `<!DOCTYPE html><html><head>${headInjections}</head><body>${bodyContent}</body></html>`;
+  return `<!DOCTYPE html><html><head>${headInjections}</head><body>${cleanedHtml}</body></html>`;
 };
 
 export const useIframeContent = (creation: Creation | null) => {
-  const srcDoc = useMemo(() => {
+  return useMemo(() => {
     if (!creation?.html) return '';
     
-    // Extract initial CSS from the model output to populate the Artifact layer
+    // Extract initial artifact styles to populate Layer 4
     const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-    let initialCss = "";
+    let artifactCss = "";
     let match;
     while ((match = styleRegex.exec(creation.html)) !== null) {
-        initialCss += match[1].trim() + "\n\n";
+        artifactCss += match[1].trim() + "\n\n";
     }
-
-    return assembleIframeDoc(creation.html, initialCss);
-  }, [creation?.id]);
-
-  return srcDoc;
+    
+    return assembleIframeDoc(creation.html, artifactCss);
+  }, [creation?.id, creation?.html]);
 };

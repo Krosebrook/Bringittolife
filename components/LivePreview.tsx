@@ -26,6 +26,7 @@ interface LivePreviewProps {
 
 export type SidePanelType = 'reference' | 'css' | 'chat';
 
+// Added React import above to ensure React namespace is available for React.FC
 export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation, isLoading: propIsLoading, isFocused, onReset }) => {
     const [showSplitView, setShowSplitView] = useState(false);
     const [activeSidePanel, setActiveSidePanel] = useState<SidePanelType>('chat');
@@ -57,17 +58,24 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const srcDoc = useIframeContent(creation);
 
-    // Initial style extraction for the editor
+    /**
+     * INITIALIZATION: Style Extraction
+     * On new creation, extract the model-generated CSS into the Editor state.
+     * This makes sure that Layer 4 (Editor) starts with the artifact's original look.
+     */
     useEffect(() => {
         if (creation) {
             const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
             let extractedCss = "";
             let match;
             while ((match = styleRegex.exec(creation.html)) !== null) {
-                extractedCss += match[1].trim() + "\n\n";
+                // We wrap the extracted styles in @layer base to allow Tailwind overrides
+                // if the user starts adding utility classes.
+                extractedCss += `/* Extracted from Artifact */\n@layer base {\n${match[1].trim()}\n}\n\n`;
             }
             setCustomCss(extractedCss.trim());
             
+            // Auto-open reference panel if it's a visual input
             if (creation.originalImage && !showSplitView && !internalCreation) {
               setShowSplitView(true);
               setActiveSidePanel('reference');
@@ -76,21 +84,23 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
     }, [creation?.id]);
 
     /**
-     * LAYER 5 SYNC: User Custom Styles
-     * Direct postMessage sync for hot-reloading user patches.
+     * CASCADE SYNC: High Priority Styles
+     * Hot-reloads the user patches (Layer 4) from the CSS Editor.
+     * These take precedence over base designs and theme studio variables.
      */
     useEffect(() => {
       const updateTimer = setTimeout(() => {
         if (iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
         }
-      }, 50); // Debounce to prevent Tailwind thrashing
+      }, 50); // Small debounce to avoid flickering during fast typing
       return () => clearTimeout(updateTimer);
     }, [customCss]);
 
     /**
-     * LAYER 3 SYNC: HSL Theme Variables
-     * Syncs the brand identity values across the design system.
+     * CASCADE SYNC: Brand Identity (HSL)
+     * Syncs dynamic theme variables (Layer 3) with the iframe runtime.
+     * Both Tailwind classes and Custom CSS can use these variables.
      */
     useEffect(() => {
       if (creation?.theme && iframeRef.current?.contentWindow) {
@@ -103,7 +113,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
 
     const handleIframeLoad = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
-            // Re-sync all layers on fresh iframe load
+            // Synchronize all design layers on fresh load
             iframeRef.current.contentWindow.postMessage({ command: isDragMode ? 'enable-drag' : 'disable-drag' }, '*');
             iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
             if (creation?.theme) {
@@ -115,8 +125,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
     const handleCopyCode = async () => {
         if (!creation?.html) return;
         try {
-            // Merge custom patches back into head for distribution
-            const styledHtml = creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`);
+            // Consolidate final refined styles into head for portability
+            const styledHtml = creation.html.replace(/<\/head>/i, `<style type="text/tailwindcss">${customCss}</style>\n</head>`);
             await navigator.clipboard.writeText(styledHtml);
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
@@ -161,7 +171,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
           onExportPdf={() => iframeRef.current?.contentWindow?.print()}
           onExportJson={() => creation && downloadArtifact(creation, `artifact_${creation.id}.json`)}
           onExportReact={() => creation && downloadFile(convertToReactComponent(creation.html, creation.name, customCss), `${creation.name}.tsx`)}
-          onExportHtml={() => creation && downloadFile(creation.html.replace(/<\/head>/i, `<style>${customCss}</style>\n</head>`), `${creation.name}.html`, 'text/html')}
+          onExportHtml={() => creation && downloadFile(creation.html.replace(/<\/head>/i, `<style type="text/tailwindcss">${customCss}</style>\n</head>`), `${creation.name}.html`, 'text/html')}
           onCopyCode={handleCopyCode}
         />
 

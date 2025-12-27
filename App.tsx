@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -13,8 +14,13 @@ import { Creation } from './types';
 import { Tooltip } from './components/ui/Tooltip';
 import { useCreation } from './hooks/useCreation';
 
+/**
+ * THE MANIFESTATION LAB - MAIN RUNTIME
+ * Decouples logic into hooks for maximum clarity and performance.
+ */
 const App: React.FC = () => {
   const { history, addCreation } = useHistory();
+  
   const { 
     activeCreation, 
     isGenerating, 
@@ -27,6 +33,10 @@ const App: React.FC = () => {
   
   const importInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * RECOVERY PROTOCOL
+   * Restores an artifact from a valid JSON export.
+   */
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -45,8 +55,8 @@ const App: React.FC = () => {
                 setActiveCreation(imported);
             }
         } catch (err) {
-            console.error("[App] Import failed:", err);
-            alert("Invalid artifact structure.");
+            console.error("[Recovery] Validation Error:", err);
+            alert("Invalid artifact structure. Migration failed.");
         }
     };
     reader.readAsText(file);
@@ -57,13 +67,14 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] bg-zinc-950 bg-dot-grid text-zinc-50 selection:bg-blue-500/30 overflow-y-auto overflow-x-hidden flex flex-col relative">
+      {/* BACKGROUND SCENE */}
       <main 
         className={`
           flex-1 flex flex-col w-full max-w-7xl mx-auto px-6 relative z-10 
-          transition-all duration-700 ease-in-out
+          transition-all duration-1000 cubic-bezier(0.23, 1, 0.32, 1)
           ${isFocused 
-            ? 'opacity-0 scale-95 blur-2xl pointer-events-none h-[100dvh] overflow-hidden' 
-            : 'opacity-100 scale-100 blur-0'
+            ? 'opacity-0 scale-95 blur-3xl pointer-events-none h-[100dvh] overflow-hidden translate-y-8' 
+            : 'opacity-100 scale-100 blur-0 translate-y-0'
           }
         `}
       >
@@ -86,12 +97,13 @@ const App: React.FC = () => {
         <footer className="mt-auto pb-12 flex flex-col items-center gap-12">
             <CreationHistory history={history} onSelect={setActiveCreation} />
             <div className="flex flex-col items-center gap-2">
-              <span className="text-[10px] text-zinc-800 font-mono tracking-[0.3em] uppercase">Manifest Engine v2.1</span>
+              <span className="text-[10px] text-zinc-800 font-mono tracking-[0.3em] uppercase">Engine Build v2.5.0-Preview</span>
               <a href="https://x.com/ammaar" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-white text-xs font-mono transition-colors">@ammaar</a>
             </div>
         </footer>
       </main>
 
+      {/* OVERLAY RUNTIME */}
       <LivePreview
         creation={activeCreation}
         isLoading={isGenerating}
@@ -99,26 +111,26 @@ const App: React.FC = () => {
         onReset={reset}
       />
 
-      {/* Persistent global action bar */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-4">
-        <Tooltip content="Restore Artifact JSON" side="top">
-            <button 
-                onClick={() => importInputRef.current?.click()}
-                className="flex items-center space-x-2 bg-zinc-900/40 backdrop-blur-lg border border-zinc-800 p-3.5 rounded-full text-zinc-500 hover:text-white transition-all hover:border-zinc-600 hover:shadow-xl active:scale-90"
-                aria-label="Import JSON"
-            >
-                <ArrowUpTrayIcon className="w-5 h-5" />
-            </button>
-        </Tooltip>
-        
-        <input 
-            type="file" 
-            ref={importInputRef} 
-            onChange={handleImportFile} 
-            accept=".json" 
-            className="hidden" 
-        />
-      </div>
+      {/* RECOVERY ACTION */}
+      {!isFocused && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          <Tooltip content="Restore Artifact (.json)" side="top">
+              <button 
+                  onClick={() => importInputRef.current?.click()}
+                  className="flex items-center space-x-2 bg-zinc-900/40 backdrop-blur-lg border border-zinc-800 p-3.5 rounded-full text-zinc-500 hover:text-white transition-all hover:border-zinc-600 hover:shadow-2xl active:scale-90"
+              >
+                  <ArrowUpTrayIcon className="w-5 h-5" />
+              </button>
+          </Tooltip>
+          <input 
+              type="file" 
+              ref={importInputRef} 
+              onChange={handleImportFile} 
+              accept=".json" 
+              className="hidden" 
+          />
+        </div>
+      )}
     </div>
   );
 };

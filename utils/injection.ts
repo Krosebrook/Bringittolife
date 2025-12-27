@@ -51,19 +51,40 @@ export const THEME_VARIABLES = `
 export const SUBTLE_BACKGROUND_STYLE = `
 <style type="text/tailwindcss">
   @layer base {
-    html {
-      line-height: 1.5;
-      -webkit-text-size-adjust: 100%;
-      -moz-tab-size: 4;
-      tab-size: 4;
-      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    /* Comprehensive Reset Layer */
+    *, *::before, *::after {
+      box-sizing: border-box;
     }
-
+    * {
+      margin: 0;
+    }
+    html, body {
+      height: 100%;
+    }
     body {
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
       @apply bg-manifest-primary text-manifest-main antialiased min-h-screen m-0;
       background: linear-gradient(300deg, var(--manifest-bg-primary), var(--manifest-bg-secondary), var(--manifest-bg-tertiary));
       background-size: 200% 200%;
       animation: manifest-gradient 15s var(--manifest-ease) infinite;
+    }
+    img, picture, video, canvas, svg {
+      display: block;
+      max-width: 100%;
+    }
+    input, button, textarea, select {
+      font: inherit;
+    }
+    p, h1, h2, h3, h4, h5, h6 {
+      overflow-wrap: break-word;
+    }
+    
+    html {
+      -webkit-text-size-adjust: 100%;
+      -moz-tab-size: 4;
+      tab-size: 4;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
     }
   }
 
@@ -78,17 +99,18 @@ export const SUBTLE_BACKGROUND_STYLE = `
 export const INTERACTIVE_STYLES = `
 <style type="text/tailwindcss">
   @layer components {
+    /* Design System Abstractions leveraging Tailwind Manifest Tokens */
     .btn, button:not([class*="manifest-ignore"]) {
       @apply cursor-pointer transition-all duration-200 select-none touch-manipulation font-medium;
       border-radius: var(--manifest-radius-md);
     }
     
     .btn-primary, button.primary {
-      @apply bg-manifest-accent text-manifest-inverse shadow-sm hover:shadow-md hover:bg-manifest-accent-hover;
+      @apply bg-manifest-accent text-manifest-inverse shadow-manifest-sm hover:shadow-manifest-md hover:bg-manifest-accent-hover;
     }
 
     .card {
-      @apply bg-manifest-card border border-manifest-border rounded-xl shadow-sm overflow-hidden;
+      @apply bg-manifest-card border border-manifest-border rounded-manifest-lg shadow-manifest-sm overflow-hidden;
     }
     
     input, textarea, select {
@@ -104,8 +126,7 @@ export const INTERACTIVE_STYLES = `
 
   /* Universal Animation Entrance */
   [data-animate="true"], section, article {
-    animation: manifest-fade-in 0.6s var(--manifest-ease) forwards;
-    opacity: 0;
+    @apply animate-manifest-fade;
   }
 
   @keyframes manifest-fade-in {

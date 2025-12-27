@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
-import { CodeBracketIcon, SwatchIcon, PhotoIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { CodeBracketIcon, SwatchIcon, PhotoIcon, ChatBubbleLeftRightIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import { Creation, DeviceMode } from '../types';
 import { WindowControls } from './live/toolbar/WindowControls';
 import { ViewportControls } from './live/toolbar/ViewportControls';
@@ -67,47 +67,58 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
     onCopyCode
 }) => {
     return (
-        <header className="bg-[#121214] px-4 py-3 flex items-center justify-between border-b border-zinc-800 shrink-0 z-50 relative">
-            <WindowControls onClose={onReset} />
+        <nav 
+          aria-label="Editor navigation"
+          className="bg-[#121214] px-4 py-3 flex items-center justify-between border-b border-zinc-800 shrink-0 z-50 relative h-16 shadow-lg"
+        >
+            <WindowControls onClose={onReset} projectName={creation?.name} />
             
-            <div className="flex items-center space-x-2 text-zinc-500 max-w-[30%] overflow-hidden">
-                <CodeBracketIcon className="w-3 h-3 shrink-0" />
-                <span className="text-[11px] font-mono uppercase tracking-wider truncate">
-                    {isLoading ? 'Processing Manifestation...' : creation ? creation.name : 'Preview'}
+            <div className="hidden lg:flex items-center space-x-2 bg-zinc-950/40 px-3 py-1.5 rounded-full border border-zinc-900/50">
+                <div className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse" />
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                    {isLoading ? 'Processing...' : 'Live Manifestation'}
                 </span>
             </div>
 
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-2">
                 {!isLoading && creation && (
                     <>
-                        <div className="flex items-center bg-zinc-900/50 rounded-md p-0.5 mr-2 border border-zinc-800/50">
-                            <Tooltip content="Refinement Lab" side="bottom">
+                        <div className="flex items-center bg-zinc-900/50 rounded-lg p-0.5 border border-zinc-800/50" role="group" aria-label="Editor panels">
+                            <Tooltip content="Refinement Lab (AI Chat)" side="bottom">
                                 <button 
                                     onClick={() => onToggleSidePanel?.('chat')}
-                                    className={`p-1.5 rounded transition-all ${showSplitView && activeSidePanel === 'chat' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    aria-label="Toggle Chat Panel"
+                                    aria-pressed={showSplitView && activeSidePanel === 'chat'}
+                                    className={`p-2 rounded-md transition-all ${showSplitView && activeSidePanel === 'chat' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
                                 >
                                     <ChatBubbleLeftRightIcon className="w-4 h-4" />
                                 </button>
                             </Tooltip>
                             {creation.originalImage && (
-                                <Tooltip content="Reference View" side="bottom">
+                                <Tooltip content="Reference Blueprint" side="bottom">
                                     <button 
                                         onClick={() => onToggleSidePanel?.('reference')}
-                                        className={`p-1.5 rounded transition-all ${showSplitView && activeSidePanel === 'reference' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        aria-label="Toggle Reference View"
+                                        aria-pressed={showSplitView && activeSidePanel === 'reference'}
+                                        className={`p-2 rounded-md transition-all ${showSplitView && activeSidePanel === 'reference' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
                                     >
                                         <PhotoIcon className="w-4 h-4" />
                                     </button>
                                 </Tooltip>
                             )}
-                            <Tooltip content="Morphing Engine" side="bottom">
+                            <Tooltip content="Style Lab (CSS)" side="bottom">
                                 <button 
                                     onClick={() => onToggleSidePanel?.('css')}
-                                    className={`p-1.5 rounded transition-all ${showSplitView && activeSidePanel === 'css' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    aria-label="Toggle CSS Editor"
+                                    aria-pressed={showSplitView && activeSidePanel === 'css'}
+                                    className={`p-2 rounded-md transition-all ${showSplitView && activeSidePanel === 'css' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
                                 >
                                     <SwatchIcon className="w-4 h-4" />
                                 </button>
                             </Tooltip>
                         </div>
+
+                        <div className="w-px h-4 bg-zinc-800 mx-1" />
 
                         <ViewportControls 
                             scale={scale}
@@ -127,8 +138,6 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                             onToggleOrientation={onToggleOrientation}
                         />
 
-                        <div className="h-4 w-px bg-zinc-800 mx-2"></div>
-
                         <ActionControls 
                             isCopied={isCopied}
                             onExportReact={onExportReact}
@@ -140,6 +149,6 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                     </>
                 )}
             </div>
-        </header>
+        </nav>
     );
 };

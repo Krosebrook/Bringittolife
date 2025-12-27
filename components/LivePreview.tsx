@@ -39,6 +39,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
     const [isDragMode, setIsDragMode] = useState(false);
     const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
     const [isLandscape, setIsLandscape] = useState(false);
+    const [accessibilityIssues, setAccessibilityIssues] = useState<any[]>([]);
 
     const { 
       activeCreation: internalCreation, 
@@ -62,12 +63,18 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const srcDoc = useIframeContent(creation);
 
-    /**
-     * INITIALIZATION: Design Extraction
-     * When a new artifact is manifested, we extract its model-generated CSS
-     * into the editor state. We wrap these in @layer utilities to ensure they
-     * override standard framework defaults while remaining editable by the user.
-     */
+    // Listen for Accessibility Audit events from the Iframe
+    useEffect(() => {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'accessibility-audit') {
+          setAccessibilityIssues(event.data.issues || []);
+        }
+      };
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
+    // Synchronize design extraction
     useEffect(() => {
         if (creation) {
             const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
@@ -77,15 +84,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                 extractedCss += `/* Refined Artifact Styles */\n@layer utilities {\n${match[1].trim()}\n}\n\n`;
             }
             
-            // Only set if we actually found new styles, to avoid unnecessary re-renders
             if (extractedCss) {
                 setCustomCss(extractedCss.trim());
             } else if (!customCss) {
-                // If no styles found and we don't have existing ones, set a helpful starting comment
                 setCustomCss("/* Add custom CSS or Tailwind @apply rules here */\n");
             }
             
-            // Automated layout optimization based on image presence
             if (creation.originalImage && !showSplitView && !internalCreation) {
               setShowSplitView(true);
               setActiveSidePanel('reference');
@@ -93,25 +97,16 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         }
     }, [creation?.id]);
 
-    /**
-     * HOT-RELOAD: High Precedence CSS
-     * Dispatches the local state CSS to the iframe's override layer.
-     * We use a tiny debounce to ensure smooth performance during active typing.
-     */
     useEffect(() => {
       const syncStyles = () => {
         if (iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
         }
       };
-      
-      const timer = setTimeout(syncStyles, 16); // 16ms = 60fps target
+      const timer = setTimeout(syncStyles, 16);
       return () => clearTimeout(timer);
     }, [customCss]);
 
-    /**
-     * HOT-RELOAD: Dynamic Brand Identity
-     */
     useEffect(() => {
       if (creation?.theme && iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({ 
@@ -123,7 +118,6 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
     const handleIframeLoad = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
-            // Re-sync all design states on fresh iframe mounting
             iframeRef.current.contentWindow.postMessage({ command: isDragMode ? 'enable-drag' : 'disable-drag' }, '*');
             iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
             if (creation?.theme) {
@@ -135,7 +129,6 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
     const handleCopyCode = async () => {
         if (!creation?.html) return;
         try {
-            // Consolidate design layers for external use
             const styledHtml = creation.html.replace(/<\/head>/i, `<style type="text/tailwindcss">${customCss}</style>\n</head>`);
             await navigator.clipboard.writeText(styledHtml);
             setIsCopied(true);
@@ -143,8 +136,23 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         } catch (err) { console.error("[Manifest] Copy Fail:", err); }
     };
 
+    // Keyboard navigation: Escape to exit
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isFocused && !isLoading) {
+          onReset();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFocused, isLoading, onReset]);
+
     return (
-      <div className={`
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label={creation ? `Editing ${creation.name}` : "Manifestation Preview"}
+        className={`
         fixed z-40 flex flex-col rounded-xl overflow-hidden border border-zinc-800 bg-[#0E0E10] shadow-2xl
         transition-all duration-700 cubic-bezier(0.2, 0.8, 0.2, 1)
         ${isFocused ? 'inset-2 md:inset-4 opacity-100 scale-100' : 'top-1/2 left-1/2 w-0 h-0 opacity-0 scale-90 pointer-events-none'}
@@ -185,13 +193,17 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
           onCopyCode={handleCopyCode}
         />
 
-        <div className="relative w-full flex-1 bg-[#09090b] flex overflow-hidden">
+        <div className="relative w-full flex-1 bg-[#09090b] flex flex-col md:flex-row overflow-hidden">
           {isLoading && !creation ? (
             <ManifestationLoading step={0} />
           ) : creation ? (
             <>
               {showSplitView && (
-                  activeSidePanel === 'reference' && creation.originalImage ? (
+                <aside 
+                  className="w-full md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-zinc-800 bg-[#0c0c0e] flex flex-col shrink-0 overflow-hidden z-20"
+                  aria-label="Refinement sidebar"
+                >
+                  {activeSidePanel === 'reference' && creation.originalImage ? (
                     <ReferencePanel image={creation.originalImage} />
                   ) : activeSidePanel === 'css' ? (
                     <CssEditorPanel 
@@ -210,7 +222,16 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                       persona={creation.persona || persona}
                       onPersonaChange={changePersona}
                     />
-                  ) : null
+                  ) : null}
+                  
+                  {/* Accessibility Badge for UI context */}
+                  {accessibilityIssues.length > 0 && (
+                    <div className="absolute bottom-20 left-4 z-50 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-md flex items-center space-x-2 animate-in fade-in slide-in-from-bottom-2">
+                       <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                       <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{accessibilityIssues.length} Accessibility Warnings</span>
+                    </div>
+                  )}
+                </aside>
               )}
               <SimulatorViewport 
                 srcDoc={srcDoc}

@@ -52,7 +52,7 @@ export const SUBTLE_BACKGROUND_STYLE = `
       max-width: none !important;
     }
 
-    /* Accessibility: Visible Focus States */
+    /* Accessibility: Visible Focus States for Keyboard Navigation */
     :focus-visible {
       @apply outline-none ring-2 ring-manifest-accent ring-offset-2 ring-offset-manifest-primary;
     }
@@ -144,68 +144,69 @@ export const DRAG_SCRIPT = `
 export const ACCESSIBILITY_AUDIT_SCRIPT = `
 <script>
   /**
-   * MANIFEST ACCESSIBILITY GUARDIAN
-   * Automatically audits and repairs accessibility gaps in generated artifacts.
+   * MANIFEST ACCESSIBILITY GUARDIAN v2.0
+   * Audits and repairs accessibility gaps in real-time.
    */
   (function() {
     function auditAccessibility() {
-      const interactive = document.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"]');
+      const issues = [];
       
-      interactive.forEach(el => {
-        // 1. Repair Button/Link Labels
-        if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button' || el.tagName === 'A') {
-          const hasLabel = el.innerText.trim() || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
-          if (!hasLabel) {
-            // Check for descriptive SVGs
-            const svg = el.querySelector('svg');
-            if (svg) {
-              const svgTitle = svg.querySelector('title')?.textContent || "Icon Action";
-              el.setAttribute('aria-label', svgTitle);
-              if (!svg.getAttribute('aria-hidden')) svg.setAttribute('aria-hidden', 'true');
-            } else {
-              // Use ID or Class hints as a last resort for debugging/screen readers
-              const fallbackLabel = el.id || el.className?.split(' ')[0] || 'Action button';
-              el.setAttribute('aria-label', fallbackLabel.replace(/[-_]/g, ' '));
-            }
+      // 1. Repair Button/Link Labels
+      const actions = document.querySelectorAll('button, a, [role="button"]');
+      actions.forEach(el => {
+        const label = el.innerText.trim() || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+        if (!label) {
+          const svg = el.querySelector('svg');
+          if (svg) {
+            const svgTitle = svg.querySelector('title')?.textContent || "Action Icon";
+            el.setAttribute('aria-label', svgTitle);
+            if (!svg.getAttribute('aria-hidden')) svg.setAttribute('aria-hidden', 'true');
+          } else {
+            const fallback = el.id || el.className?.split(' ')[0] || 'Action';
+            el.setAttribute('aria-label', fallback.replace(/[-_]/g, ' '));
+            issues.push({ type: 'warning', msg: 'Button missing descriptive label.', target: el.tagName });
           }
-        }
-        
-        // 2. Repair Input Labels
-        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) {
-          const id = el.id;
-          const hasLabel = (id && document.querySelector('label[for="' + id + '"]')) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
-          
-          if (!hasLabel) {
-            const placeholder = el.getAttribute('placeholder');
-            if (placeholder) {
-              el.setAttribute('aria-label', placeholder);
-            } else {
-              el.setAttribute('aria-label', el.tagName.toLowerCase() + ' input');
-            }
-          }
-        }
-
-        // 3. Ensure proper role for custom components
-        if (el.classList.contains('btn') && el.tagName === 'DIV') {
-          el.setAttribute('role', 'button');
-          if (el.tabIndex < 0) el.tabIndex = 0;
         }
       });
 
-      // 4. Document Structure Audit
-      if (!document.querySelector('h1')) {
-        console.warn('[Manifest Audit] No H1 found in artifact. Semantic structure is incomplete.');
+      // 2. Repair Image Alt Tags
+      const images = document.querySelectorAll('img');
+      images.forEach(img => {
+        if (!img.hasAttribute('alt')) {
+          img.setAttribute('alt', ''); // Default to decorative if missing
+          issues.push({ type: 'info', msg: 'Image missing alt attribute.', target: 'IMG' });
+        }
+      });
+      
+      // 3. Form Control Labels
+      const inputs = document.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => {
+        const id = input.id;
+        const label = (id && document.querySelector('label[for="' + id + '"]')) || input.getAttribute('aria-label');
+        if (!label) {
+          const placeholder = input.getAttribute('placeholder');
+          if (placeholder) input.setAttribute('aria-label', placeholder);
+          issues.push({ type: 'warning', msg: 'Input missing explicit label.', target: input.tagName });
+        }
+      });
+
+      // 4. Heading Hierarchy
+      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      if (headings.length > 0 && headings[0].tagName !== 'H1') {
+        issues.push({ type: 'warning', msg: 'Heading hierarchy should start with H1.', target: 'Headings' });
       }
+
+      // Ensure language is set
+      if (!document.documentElement.getAttribute('lang')) {
+        document.documentElement.setAttribute('lang', 'en');
+      }
+
+      // Report to host
+      window.parent.postMessage({ type: 'accessibility-audit', issues }, '*');
     }
 
-    // Run audit on load and whenever a manifest update might occur
     window.addEventListener('load', auditAccessibility);
-    
-    // MutationObserver for real-time reactivity to AI generation or user edits
-    const observer = new MutationObserver((mutations) => {
-      auditAccessibility();
-    });
-    
+    const observer = new MutationObserver(() => auditAccessibility());
     observer.observe(document.body, { childList: true, subtree: true });
   })();
 </script>

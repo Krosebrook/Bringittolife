@@ -40,10 +40,21 @@ export const SUBTLE_BACKGROUND_STYLE = `
 <style type="text/tailwindcss">
   @layer base {
     body {
-      @apply bg-manifest-primary text-manifest-main antialiased min-h-screen m-0;
+      @apply bg-manifest-primary text-manifest-main antialiased min-h-screen m-0 
+             prose prose-zinc dark:prose-invert max-w-none;
       background: linear-gradient(300deg, var(--manifest-bg-primary), var(--manifest-bg-secondary), var(--manifest-bg-tertiary));
       background-size: 200% 200%;
       animation: manifest-gradient 15s ease infinite;
+    }
+    
+    /* Ensure typography doesn't force a max-width on the app layout */
+    .prose {
+      max-width: none !important;
+    }
+
+    /* Accessibility: Visible Focus States */
+    :focus-visible {
+      @apply outline-none ring-2 ring-manifest-accent ring-offset-2 ring-offset-manifest-primary;
     }
   }
 
@@ -59,16 +70,16 @@ export const INTERACTIVE_STYLES = `
 <style type="text/tailwindcss">
   @layer components {
     .btn {
-      @apply cursor-pointer transition-all duration-200 select-none font-medium;
+      @apply cursor-pointer transition-all duration-200 select-none font-medium no-underline inline-flex items-center justify-center;
       border-radius: var(--manifest-radius-md);
     }
     
     .btn-primary {
-      @apply bg-manifest-accent text-manifest-inverse shadow-manifest-sm hover:bg-manifest-accent-hover;
+      @apply bg-manifest-accent text-manifest-inverse shadow-manifest-sm hover:bg-manifest-accent-hover !no-underline;
     }
 
     .card {
-      @apply bg-manifest-card border border-manifest-border rounded-manifest-lg shadow-manifest-sm overflow-hidden;
+      @apply bg-manifest-card border border-manifest-border rounded-manifest-lg shadow-manifest-sm overflow-hidden not-prose;
     }
   }
 
@@ -126,6 +137,76 @@ export const DRAG_SCRIPT = `
       }
       activeItem = null;
     });
+  })();
+</script>
+`;
+
+export const ACCESSIBILITY_AUDIT_SCRIPT = `
+<script>
+  /**
+   * MANIFEST ACCESSIBILITY GUARDIAN
+   * Automatically audits and repairs accessibility gaps in generated artifacts.
+   */
+  (function() {
+    function auditAccessibility() {
+      const interactive = document.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="link"]');
+      
+      interactive.forEach(el => {
+        // 1. Repair Button/Link Labels
+        if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button' || el.tagName === 'A') {
+          const hasLabel = el.innerText.trim() || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+          if (!hasLabel) {
+            // Check for descriptive SVGs
+            const svg = el.querySelector('svg');
+            if (svg) {
+              const svgTitle = svg.querySelector('title')?.textContent || "Icon Action";
+              el.setAttribute('aria-label', svgTitle);
+              if (!svg.getAttribute('aria-hidden')) svg.setAttribute('aria-hidden', 'true');
+            } else {
+              // Use ID or Class hints as a last resort for debugging/screen readers
+              const fallbackLabel = el.id || el.className?.split(' ')[0] || 'Action button';
+              el.setAttribute('aria-label', fallbackLabel.replace(/[-_]/g, ' '));
+            }
+          }
+        }
+        
+        // 2. Repair Input Labels
+        if (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)) {
+          const id = el.id;
+          const hasLabel = (id && document.querySelector('label[for="' + id + '"]')) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+          
+          if (!hasLabel) {
+            const placeholder = el.getAttribute('placeholder');
+            if (placeholder) {
+              el.setAttribute('aria-label', placeholder);
+            } else {
+              el.setAttribute('aria-label', el.tagName.toLowerCase() + ' input');
+            }
+          }
+        }
+
+        // 3. Ensure proper role for custom components
+        if (el.classList.contains('btn') && el.tagName === 'DIV') {
+          el.setAttribute('role', 'button');
+          if (el.tabIndex < 0) el.tabIndex = 0;
+        }
+      });
+
+      // 4. Document Structure Audit
+      if (!document.querySelector('h1')) {
+        console.warn('[Manifest Audit] No H1 found in artifact. Semantic structure is incomplete.');
+      }
+    }
+
+    // Run audit on load and whenever a manifest update might occur
+    window.addEventListener('load', auditAccessibility);
+    
+    // MutationObserver for real-time reactivity to AI generation or user edits
+    const observer = new MutationObserver((mutations) => {
+      auditAccessibility();
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
   })();
 </script>
 `;

@@ -23,6 +23,7 @@ CORE ARCHITECTURAL PRINCIPLES:
 3. RUNTIME: Use modern ES6+ Vanilla JavaScript for interactivity.
 4. GROUNDING: When the 'googleSearch' tool is invoked, use ACTUAL data (real news, stock prices) to populate the UI.
 5. CONTINUITY: For iterations, always return the FULL, functional HTML document.
+6. ACCESSIBILITY: Every interactive element MUST have a clear ARIA label. Use semantic tags (<main>, <nav>, <section>, <header>, <footer>). Ensure focus states are visible and contrast ratios meet WCAG 2.1 AA standards.
 
 AESTHETIC GUARDRAILS:
 - Always include an elegant, subtle background.

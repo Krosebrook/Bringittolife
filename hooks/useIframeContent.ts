@@ -5,7 +5,7 @@
  */
 import { useMemo } from 'react';
 import { Creation } from '../types';
-import { INTERACTIVE_STYLES, SUBTLE_BACKGROUND_STYLE, THEME_VARIABLES, DRAG_SCRIPT } from '../utils/injection';
+import { INTERACTIVE_STYLES, SUBTLE_BACKGROUND_STYLE, THEME_VARIABLES, DRAG_SCRIPT, ACCESSIBILITY_AUDIT_SCRIPT } from '../utils/injection';
 
 /**
  * PRODUCTION-GRADE IFRAME ARCHITECT
@@ -57,7 +57,29 @@ const assembleIframeDoc = (rawHtml: string): string => {
     '        boxShadow: {',
     '          "manifest-sm": "var(--manifest-shadow-sm)",',
     '          "manifest-md": "var(--manifest-shadow-md)",',
-    '        }',
+    '        },',
+    '        typography: ({ theme }) => ({',
+    '          zinc: {',
+    '            css: {',
+    '              "--tw-prose-body": "var(--manifest-text-main)",',
+    '              "--tw-prose-headings": "var(--manifest-text-main)",',
+    '              "--tw-prose-lead": "var(--manifest-text-sub)",',
+    '              "--tw-prose-links": "var(--manifest-accent)",',
+    '              "--tw-prose-bold": "var(--manifest-text-main)",',
+    '              "--tw-prose-counters": "var(--manifest-text-muted)",',
+    '              "--tw-prose-bullets": "var(--manifest-text-muted)",',
+    '              "--tw-prose-hr": "var(--manifest-border)",',
+    '              "--tw-prose-quotes": "var(--manifest-text-main)",',
+    '              "--tw-prose-quote-borders": "var(--manifest-accent)",',
+    '              "--tw-prose-captions": "var(--manifest-text-muted)",',
+    '              "--tw-prose-code": "var(--manifest-text-main)",',
+    '              "--tw-prose-pre-code": "var(--manifest-text-inverse)",',
+    '              "--tw-prose-pre-bg": "var(--manifest-text-main)",',
+    '              "--tw-prose-th-borders": "var(--manifest-border)",',
+    '              "--tw-prose-td-borders": "var(--manifest-border)",',
+    '            },',
+    '          },',
+    '        }),',
     '      }',
     '    }',
     '  }',
@@ -110,7 +132,8 @@ const assembleIframeDoc = (rawHtml: string): string => {
         }
       });
     </script>`,
-    DRAG_SCRIPT 
+    DRAG_SCRIPT,
+    ACCESSIBILITY_AUDIT_SCRIPT
   ].join('\n    ');
 
   // Inject at the end of <head> for maximum CSS specificity over any model-generated remnants
@@ -118,7 +141,7 @@ const assembleIframeDoc = (rawHtml: string): string => {
     return cleanedHtml.replace(/<\/head>/i, `${headInjections}\n</head>`);
   }
   
-  return `<!DOCTYPE html><html><head>${headInjections}</head><body>${cleanedHtml}</body></html>`;
+  return `<!DOCTYPE html><html class="dark" lang="en"><head>${headInjections}</head><body>${cleanedHtml}</body></html>`;
 };
 
 export const useIframeContent = (creation: Creation | null) => {

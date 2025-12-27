@@ -16,37 +16,20 @@ const INITIAL_STATE: GenerationState = {
   progressStep: 0,
 };
 
-/**
- * THE MANIFESTATION ORCHESTRATOR
- * ---------------------------------------------------------
- * Manages the entire lifecycle of an artifact: from initial 
- * multimodal synthesis to voice-driven refinements.
- * 
- * @param onCreationFinalized Callback fired when a stable artifact is ready for the archive.
- */
 export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
   const [activeCreation, setActiveCreation] = useState<Creation | null>(null);
   const [state, setState] = useState<GenerationState>(INITIAL_STATE);
   const [persona, setPersona] = useState<DesignPersona>('modernist');
 
-  /**
-   * Updates the HSL brand identity of the active artifact.
-   */
   const updateTheme = useCallback((theme: ThemeState) => {
     setActiveCreation(prev => prev ? { ...prev, theme } : null);
   }, []);
 
-  /**
-   * Swaps the design persona for the current session.
-   */
   const changePersona = useCallback((newPersona: DesignPersona) => {
     setPersona(newPersona);
     setActiveCreation(prev => prev ? { ...prev, persona: newPersona } : null);
   }, []);
 
-  /**
-   * Internal helper to commit refinement requests to the Gemini API.
-   */
   const refine = useCallback(async (prompt: string, isVoice = false) => {
     if (!activeCreation) return;
     
@@ -68,12 +51,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       const updatedHistory: ChatMessage[] = [
         ...(activeCreation.chatHistory || []),
         { role: 'user', text: prompt, timestamp: new Date(), isVoiceInput: isVoice },
-        { 
-          role: 'model', 
-          text: 'Refinement synthesis complete.', 
-          timestamp: new Date(), 
-          grounding: formattedGrounding 
-        }
+        { role: 'model', text: 'Refined successfully.', timestamp: new Date(), grounding: formattedGrounding }
       ];
 
       const updatedCreation: Creation = {
@@ -87,18 +65,11 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       onCreationFinalized(updatedCreation);
       setState(INITIAL_STATE);
     } catch (error) {
-      console.error("[Manifestation] Refinement Cycle Fault:", error);
-      setState(s => ({ 
-        ...s, 
-        isLoading: false, 
-        error: "Refinement cycle failed. The neural bridge timed out." 
-      }));
+      console.error("[Manifestation] Refinement Error:", error);
+      setState(s => ({ ...s, isLoading: false, error: "Refinement failed. Please try again." }));
     }
   }, [activeCreation, persona, onCreationFinalized]);
 
-  /**
-   * Toggles the low-latency voice design session.
-   */
   const toggleVoiceMode = useCallback(async () => {
     if (state.isListening) {
       liveDesignService.close();
@@ -111,19 +82,16 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       await liveDesignService.connect(
         (command) => refine(command, true),
         (err) => {
-          console.error("[Live] Bridge Error:", err);
-          setState(s => ({ ...s, error: "Voice session lost. Check connectivity.", isListening: false }));
+          console.error("[Live] Error:", err);
+          setState(s => ({ ...s, error: "Voice session lost.", isListening: false }));
         }
       );
       await liveDesignService.startListening();
     } catch (e) {
-      setState(s => ({ ...s, isListening: false, error: "Hardware access (Microphone) was denied by the OS." }));
+      setState(s => ({ ...s, isListening: false, error: "Microphone access denied." }));
     }
   }, [state.isListening, refine]);
 
-  /**
-   * Generates a new artifact from text or image input.
-   */
   const generateFromPrompt = useCallback(async (promptText: string, file?: File) => {
     setState(s => ({ ...s, isLoading: true, error: null, progressStep: 0 }));
     try {
@@ -139,7 +107,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       
       const newCreation: Creation = {
         id: crypto.randomUUID(),
-        name: file ? file.name : (promptText.length > 20 ? promptText.substring(0, 20) + "..." : promptText),
+        name: file ? file.name : (promptText.slice(0, 20) || 'Manifestation'),
         html,
         originalImage: imageBase64 && mimeType ? `data:${mimeType};base64,${imageBase64}` : undefined,
         timestamp: new Date(),
@@ -152,15 +120,11 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       onCreationFinalized(newCreation);
       setState(INITIAL_STATE);
     } catch (error) {
-      console.error("[Manifestation] Synthesis Fault:", error);
-      setState(s => ({ ...s, isLoading: false, error: "Initial manifestation failed. High load detected." }));
+      console.error("[Manifestation] Generation Error:", error);
+      setState(s => ({ ...s, isLoading: false, error: "Initial synthesis failed." }));
     }
   }, [persona, onCreationFinalized]);
 
-  /**
-   * Generates a starter reference image before manifestating code.
-   * Useful for text-only prompts to provide visual grounding.
-   */
   const generateFromText = useCallback(async (prompt: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }));
     try {
@@ -169,7 +133,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
 
       const newCreation: Creation = {
         id: crypto.randomUUID(),
-        name: prompt.length > 20 ? prompt.substring(0, 20) + "..." : prompt,
+        name: prompt.slice(0, 20),
         html,
         originalImage: `data:${mimeType};base64,${base64}`,
         timestamp: new Date(),
@@ -182,8 +146,8 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       onCreationFinalized(newCreation);
       setState(INITIAL_STATE);
     } catch (error) {
-      console.error("[Manifestation] Sequential Synthesis Fault:", error);
-      setState(s => ({ ...s, isLoading: false, error: "Visual-to-Code synthesis cycle failed." }));
+      console.error("[Manifestation] Sequential Error:", error);
+      setState(s => ({ ...s, isLoading: false, error: "Visual-to-Code synthesis failed." }));
     }
   }, [persona, onCreationFinalized]);
 

@@ -26,8 +26,12 @@ interface LivePreviewProps {
 
 export type SidePanelType = 'reference' | 'css' | 'chat';
 
-// Added React import above to ensure React namespace is available for React.FC
-export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation, isLoading: propIsLoading, isFocused, onReset }) => {
+export const LivePreview: React.FC<LivePreviewProps> = ({ 
+  creation: propCreation, 
+  isLoading: propIsLoading, 
+  isFocused, 
+  onReset 
+}) => {
     const [showSplitView, setShowSplitView] = useState(false);
     const [activeSidePanel, setActiveSidePanel] = useState<SidePanelType>('chat');
     const [customCss, setCustomCss] = useState<string>("");
@@ -59,9 +63,10 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
     const srcDoc = useIframeContent(creation);
 
     /**
-     * INITIALIZATION: Style Extraction
-     * On new creation, extract the model-generated CSS into the Editor state.
-     * This makes sure that Layer 4 (Editor) starts with the artifact's original look.
+     * INITIALIZATION: Design Extraction
+     * When a new artifact is manifested, we extract its model-generated CSS
+     * into the editor state. We wrap these in @layer utilities to ensure they
+     * override standard framework defaults while remaining editable by the user.
      */
     useEffect(() => {
         if (creation) {
@@ -69,13 +74,18 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
             let extractedCss = "";
             let match;
             while ((match = styleRegex.exec(creation.html)) !== null) {
-                // We wrap the extracted styles in @layer base to allow Tailwind overrides
-                // if the user starts adding utility classes.
-                extractedCss += `/* Extracted from Artifact */\n@layer base {\n${match[1].trim()}\n}\n\n`;
+                extractedCss += `/* Refined Artifact Styles */\n@layer utilities {\n${match[1].trim()}\n}\n\n`;
             }
-            setCustomCss(extractedCss.trim());
             
-            // Auto-open reference panel if it's a visual input
+            // Only set if we actually found new styles, to avoid unnecessary re-renders
+            if (extractedCss) {
+                setCustomCss(extractedCss.trim());
+            } else if (!customCss) {
+                // If no styles found and we don't have existing ones, set a helpful starting comment
+                setCustomCss("/* Add custom CSS or Tailwind @apply rules here */\n");
+            }
+            
+            // Automated layout optimization based on image presence
             if (creation.originalImage && !showSplitView && !internalCreation) {
               setShowSplitView(true);
               setActiveSidePanel('reference');
@@ -84,23 +94,23 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
     }, [creation?.id]);
 
     /**
-     * CASCADE SYNC: High Priority Styles
-     * Hot-reloads the user patches (Layer 4) from the CSS Editor.
-     * These take precedence over base designs and theme studio variables.
+     * HOT-RELOAD: High Precedence CSS
+     * Dispatches the local state CSS to the iframe's override layer.
+     * We use a tiny debounce to ensure smooth performance during active typing.
      */
     useEffect(() => {
-      const updateTimer = setTimeout(() => {
+      const syncStyles = () => {
         if (iframeRef.current?.contentWindow) {
           iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
         }
-      }, 50); // Small debounce to avoid flickering during fast typing
-      return () => clearTimeout(updateTimer);
+      };
+      
+      const timer = setTimeout(syncStyles, 16); // 16ms = 60fps target
+      return () => clearTimeout(timer);
     }, [customCss]);
 
     /**
-     * CASCADE SYNC: Brand Identity (HSL)
-     * Syncs dynamic theme variables (Layer 3) with the iframe runtime.
-     * Both Tailwind classes and Custom CSS can use these variables.
+     * HOT-RELOAD: Dynamic Brand Identity
      */
     useEffect(() => {
       if (creation?.theme && iframeRef.current?.contentWindow) {
@@ -109,11 +119,11 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
           ...creation.theme 
         }, '*');
       }
-    }, [creation?.theme]);
+    }, [creation?.theme, creation?.id]);
 
     const handleIframeLoad = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
-            // Synchronize all design layers on fresh load
+            // Re-sync all design states on fresh iframe mounting
             iframeRef.current.contentWindow.postMessage({ command: isDragMode ? 'enable-drag' : 'disable-drag' }, '*');
             iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
             if (creation?.theme) {
@@ -125,12 +135,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ creation: propCreation
     const handleCopyCode = async () => {
         if (!creation?.html) return;
         try {
-            // Consolidate final refined styles into head for portability
+            // Consolidate design layers for external use
             const styledHtml = creation.html.replace(/<\/head>/i, `<style type="text/tailwindcss">${customCss}</style>\n</head>`);
             await navigator.clipboard.writeText(styledHtml);
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error("[Manifest] Copy Fail:", err); }
     };
 
     return (

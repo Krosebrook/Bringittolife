@@ -8,19 +8,21 @@ import { Creation } from '../types';
 import { INTERACTIVE_STYLES, SUBTLE_BACKGROUND_STYLE, THEME_VARIABLES, DRAG_SCRIPT } from '../utils/injection';
 
 /**
- * HIGH-PRECEDENCE IFRAME ARCHITECT
- * Manages the transition from machine-generated HTML to a fully customizable,
- * Tailwind-powered Design System.
+ * PRODUCTION-GRADE IFRAME ARCHITECT
+ * ---------------------------------------------------------
+ * This function constructs the runtime environment for the generated artifacts.
+ * It implements a "Design System Bridge" that connects the CSS variables in the
+ * host app to the Tailwind CSS engine inside the iframe.
  */
 const assembleIframeDoc = (rawHtml: string): string => {
-  // Purge existing styles from raw HTML to centralize design control in the layers.
-  // This prevents legacy or model-generated style tags from polluting the cascade.
+  // Purge any existing style tags from the raw artifact to prevent "ghost styles"
+  // and ensure the CSS Editor remains the single source of truth for the final design.
   const cleanedHtml = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
   
   const headInjections = [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    '<!-- Tailwind Play CDN with essential plugins -->',
+    '<!-- Tailwind Play CDN -->',
     '<script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>',
     '<script>',
     '  tailwind.config = {',
@@ -31,6 +33,7 @@ const assembleIframeDoc = (rawHtml: string): string => {
     '          manifest: { ',
     '            accent: "hsl(var(--m-accent-h) var(--m-accent-s) var(--m-accent-l) / <alpha-value>)", ',
     '            "accent-hover": "hsl(var(--m-accent-h) var(--m-accent-s) calc(var(--m-accent-l) - 8%) / <alpha-value>)",',
+    '            "accent-glow": "hsla(var(--m-accent-h), var(--m-accent-s), var(--m-accent-l), 0.35)",',
     '            primary: "var(--manifest-bg-primary)",',
     '            secondary: "var(--manifest-bg-secondary)",',
     '            tertiary: "var(--manifest-bg-tertiary)",',
@@ -51,47 +54,42 @@ const assembleIframeDoc = (rawHtml: string): string => {
     '        transitionTimingFunction: {',
     '          "manifest": "var(--manifest-ease)",',
     '        },',
-    '        animation: {',
-    '          "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",',
-    '          "manifest-fade": "manifest-fade-in 0.6s var(--manifest-ease) forwards",',
-    '        },',
     '        boxShadow: {',
     '          "manifest-sm": "var(--manifest-shadow-sm)",',
     '          "manifest-md": "var(--manifest-shadow-md)",',
-    '          "manifest-lg": "var(--manifest-shadow-lg)",',
     '        }',
     '      }',
     '    }',
     '  }',
     '</script>',
     
-    '<!-- Layer 1: Core System Variables (Low Priority) -->',
+    '<!-- LAYER 1: Core System & Brand Identity Variables -->',
     `<style id="layer-variables">${THEME_VARIABLES}</style>`,
+    `<style id="layer-theme-studio"></style>`,
     
-    '<!-- Layer 2: Design System Foundation (Tailwind Layers) -->',
+    '<!-- LAYER 2 & 3: Framework Foundation & Interactive Patterns -->',
     SUBTLE_BACKGROUND_STYLE,
     INTERACTIVE_STYLES,
 
-    '<!-- Layer 3: Dynamic Theme Studio (Mid Priority) -->',
-    `<style id="layer-theme-studio"></style>`,
-
-    '<!-- Layer 4: Custom CSS Editor / Artifact Styles (High Priority - Final Override) -->',
-    '<!-- This layer uses type="text/tailwindcss" so users can use @apply directives -->',
+    '<!-- LAYER 4: The Final Override (Highest Precedence) -->',
+    '<!-- This block handles custom CSS from the editor, injected at runtime. -->',
+    '<!-- It uses type="text/tailwindcss" so users can use @apply and other Tailwind directives. -->',
     `<style type="text/tailwindcss" id="layer-user-patch"></style>`,
 
     `<script>
-      // Style Synchronization Bridge
+      /**
+       * DESIGN SYNCHRONIZATION BRIDGE
+       * Listens for messages from the host to update styles and themes without reloading.
+       */
       window.addEventListener('message', (event) => {
         const { type, css, h, s, l, command } = event.data || {};
         
         if (type === 'update-css') {
           const patchLayer = document.getElementById('layer-user-patch');
           if (patchLayer) {
+            // Update the CSS content. Tailwind's Play CDN automatically re-processes 
+            // when it detects a change in a <style type="text/tailwindcss"> tag.
             patchLayer.innerHTML = css;
-            // Trigger Tailwind to re-process if the CDN provides a refresh mechanism
-            if (window.tailwind && typeof window.tailwind.reprocess === 'function') {
-               window.tailwind.reprocess();
-            }
           }
         }
         
@@ -115,7 +113,7 @@ const assembleIframeDoc = (rawHtml: string): string => {
     DRAG_SCRIPT 
   ].join('\n    ');
 
-  // Insert injections at the end of head for maximum specificity over default browser/Tailwind resets
+  // Inject at the end of <head> for maximum CSS specificity over any model-generated remnants
   if (cleanedHtml.toLowerCase().includes('</head>')) {
     return cleanedHtml.replace(/<\/head>/i, `${headInjections}\n</head>`);
   }

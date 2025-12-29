@@ -29,6 +29,26 @@ Manifestation Lab is a production-grade neural synthesis environment that transf
 - **Icons**: Heroicons v2.2
 - **Visuals**: PDF.js, CSS Dot Grid, Noise Textures
 
+## 📚 Documentation
+
+**→ [START HERE: SUMMARY.md](./SUMMARY.md)** - Quick start guide and overview
+
+Core Documentation:
+- **[AUDIT.md](./AUDIT.md)**: Comprehensive codebase audit and recommendations (15,700 words)
+- **[REPOSITORIES.md](./REPOSITORIES.md)**: 6 recommended repositories for reference and integration (14,600 words)
+- **[GITHUB_AGENT_PROMPTS.md](./GITHUB_AGENT_PROMPTS.md)**: 5 context-engineered prompts for GitHub agents (26,300 words)
+- **[COPILOT_PROMPT.md](./COPILOT_PROMPT.md)**: GitHub Copilot context prompt (16,300 words)
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)**: Technical architecture overview
+- **[PRD.md](./PRD.md)**: Product requirements document
+
+## 🤖 AI-Assisted Development
+
+This project includes comprehensive prompts and instructions for AI-assisted development:
+
+- **GitHub Copilot**: See [.github/copilot-instructions.md](./.github/copilot-instructions.md)
+- **GitHub Agents**: Use prompts from [GITHUB_AGENT_PROMPTS.md](./GITHUB_AGENT_PROMPTS.md)
+- **Best Practices**: Follow guidelines in [AUDIT.md](./AUDIT.md)
+
 ## 🛡️ License
 
 SPDX-License-Identifier: Apache-2.0

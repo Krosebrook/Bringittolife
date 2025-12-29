@@ -51,7 +51,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       const updatedHistory: ChatMessage[] = [
         ...(activeCreation.chatHistory || []),
         { role: 'user', text: prompt, timestamp: new Date(), isVoiceInput: isVoice },
-        { role: 'model', text: 'Refined successfully.', timestamp: new Date(), grounding: formattedGrounding }
+        { role: 'model', text: 'Mutation successfully integrated.', timestamp: new Date(), grounding: formattedGrounding }
       ];
 
       const updatedCreation: Creation = {
@@ -65,8 +65,8 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       onCreationFinalized(updatedCreation);
       setState(INITIAL_STATE);
     } catch (error) {
-      console.error("[Manifestation] Refinement Error:", error);
-      setState(s => ({ ...s, isLoading: false, error: "Refinement failed. Please try again." }));
+      console.error("[Manifest] Mutation Error:", error);
+      setState(s => ({ ...s, isLoading: false, error: "Synthesis of change failed." }));
     }
   }, [activeCreation, persona, onCreationFinalized]);
 
@@ -77,18 +77,20 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       return;
     }
 
-    setState(s => ({ ...s, isListening: true }));
+    setState(s => ({ ...s, isListening: true, error: null }));
     try {
       await liveDesignService.connect(
-        (command) => refine(command, true),
+        (transcription) => {
+          if (transcription.trim()) refine(transcription, true);
+        },
         (err) => {
-          console.error("[Live] Error:", err);
-          setState(s => ({ ...s, error: "Voice session lost.", isListening: false }));
+          console.error("[Live] Protocol Fault:", err);
+          setState(s => ({ ...s, error: "Voice connection lost.", isListening: false }));
         }
       );
       await liveDesignService.startListening();
     } catch (e) {
-      setState(s => ({ ...s, isListening: false, error: "Microphone access denied." }));
+      setState(s => ({ ...s, isListening: false, error: "Access to sensory input denied." }));
     }
   }, [state.isListening, refine]);
 
@@ -107,7 +109,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       
       const newCreation: Creation = {
         id: crypto.randomUUID(),
-        name: file ? file.name : (promptText.slice(0, 20) || 'Manifestation'),
+        name: file ? file.name : (promptText.slice(0, 24) || 'Unbound Artifact'),
         html,
         originalImage: imageBase64 && mimeType ? `data:${mimeType};base64,${imageBase64}` : undefined,
         timestamp: new Date(),
@@ -120,8 +122,8 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       onCreationFinalized(newCreation);
       setState(INITIAL_STATE);
     } catch (error) {
-      console.error("[Manifestation] Generation Error:", error);
-      setState(s => ({ ...s, isLoading: false, error: "Initial synthesis failed." }));
+      console.error("[Manifest] Synthesis Error:", error);
+      setState(s => ({ ...s, isLoading: false, error: "Initial manifestation failed." }));
     }
   }, [persona, onCreationFinalized]);
 
@@ -133,7 +135,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
 
       const newCreation: Creation = {
         id: crypto.randomUUID(),
-        name: prompt.slice(0, 20),
+        name: prompt.slice(0, 24),
         html,
         originalImage: `data:${mimeType};base64,${base64}`,
         timestamp: new Date(),
@@ -146,8 +148,8 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
       onCreationFinalized(newCreation);
       setState(INITIAL_STATE);
     } catch (error) {
-      console.error("[Manifestation] Sequential Error:", error);
-      setState(s => ({ ...s, isLoading: false, error: "Visual-to-Code synthesis failed." }));
+      console.error("[Manifest] Sequential Synthesis Fault:", error);
+      setState(s => ({ ...s, isLoading: false, error: "Failed to bridge visual and structural logic." }));
     }
   }, [persona, onCreationFinalized]);
 

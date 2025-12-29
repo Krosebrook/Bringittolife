@@ -7,10 +7,10 @@ import { THEME_VARIABLES } from './injection';
 import { ThemeState } from '../types';
 
 /**
- * PRODUCTION-GRADE HTML TO REACT ARCHITECT v3.1
+ * PRODUCTION-GRADE HTML TO REACT ARCHITECT v4.0
  * ---------------------------------------------------------
- * Performs deep semantic analysis of flat artifact HTML and transfigures it 
- * into a modular, state-aware React application.
+ * Performs deep semantic analysis and structural inference to transfigure 
+ * flat artifact HTML into a modular, production-ready React application.
  */
 
 const ATTRIBUTE_MAP: Record<string, string> = {
@@ -43,12 +43,15 @@ const ATTRIBUTE_MAP: Record<string, string> = {
   'gradientunits': 'gradientUnits',
   'preserveaspectratio': 'preserveAspectRatio',
   'xlink:href': 'xlinkHref',
+  'aria-label': 'aria-label', // React supports aria-* as is
 };
 
 function toPascalCase(str: string) {
+  if (!str) return 'Component';
   return str
     .replace(/[^a-zA-Z0-9]/g, ' ')
     .split(' ')
+    .filter(Boolean)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join('');
 }
@@ -86,51 +89,59 @@ function elementToJSX(node: Node, stateMap: Map<HTMLElement, StateInfo>, depth: 
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent?.trim();
     if (!text) return '';
+    // Escape curly braces for JSX
     return text.replace(/{/g, '{"{"}').replace(/}/g, '{"}"}');
   }
+  
   if (node.nodeType === Node.COMMENT_NODE) {
     return `{/* ${node.textContent} */}`;
   }
+  
   if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
   const el = node as HTMLElement;
   const tagName = el.tagName.toLowerCase();
-  if (tagName === 'script' || tagName === 'style') return '';
+  
+  // Skip technical tags already handled by the root wrapper
+  if (['script', 'style', 'title', 'meta', 'link'].includes(tagName)) return '';
 
   const attributes: string[] = [];
   const state = stateMap.get(el);
 
   for (let i = 0; i < el.attributes.length; i++) {
     const attr = el.attributes[i];
-    const name = ATTRIBUTE_MAP[attr.name.toLowerCase()] || attr.name;
+    const originalName = attr.name.toLowerCase();
+    const name = ATTRIBUTE_MAP[originalName] || originalName;
     
+    // Controlled components: value and checked are handled via state mapping
     if (state && (name === 'value' || name === 'checked')) continue;
 
     if (name === 'style') {
       attributes.push(`${name}={${parseStyle(attr.value)}}`);
     } else if (name === 'className') {
       attributes.push(`${name}="${attr.value}"`);
-    } else if (name === 'onClick') {
-      // If it's a button and we want to show it's interactive, we could add a log
-      attributes.push(`${name}={() => console.log("${tagName} clicked")}`);
     } else if (name.startsWith('on')) {
-      attributes.push(`${name}={(e) => console.log("${name} event", e)}`);
-    } else {
-      if (['disabled', 'checked', 'required', 'readOnly', 'hidden'].includes(name) && (attr.value === '' || attr.value === 'true')) {
+      // Invert local handlers to React event placeholders
+      const handlerName = name.charAt(0).toUpperCase() + name.slice(1);
+      attributes.push(`${handlerName}={() => console.log("${tagName} ${name} triggered")}`);
+    } else if (['disabled', 'checked', 'required', 'readOnly', 'hidden', 'autoFocus'].includes(name)) {
+      if (attr.value === '' || attr.value === 'true' || attr.value === name) {
         attributes.push(`${name}={true}`);
-      } else {
-        attributes.push(`${name}="${attr.value.replace(/"/g, '&quot;')}"`);
       }
+    } else {
+      // General attribute escaping
+      attributes.push(`${name}="${attr.value.replace(/"/g, '&quot;')}"`);
     }
   }
 
+  // Inject state management logic for interactive elements
   if (state) {
     if (state.type === 'boolean') {
-      attributes.push(`checked={formData.${state.name}}`);
-      attributes.push(`onChange={(e) => handleInputChange('${state.name}', e.target.checked)}`);
+      attributes.push(`checked={uiState.${state.name}}`);
+      attributes.push(`onChange={(e) => updateState('${state.name}', e.target.checked)}`);
     } else {
-      attributes.push(`value={formData.${state.name}}`);
-      attributes.push(`onChange={(e) => handleInputChange('${state.name}', e.target.value)}`);
+      attributes.push(`value={uiState.${state.name}}`);
+      attributes.push(`onChange={(e) => updateState('${state.name}', e.target.value)}`);
     }
   }
 
@@ -138,7 +149,7 @@ function elementToJSX(node: Node, stateMap: Map<HTMLElement, StateInfo>, depth: 
     .map(child => elementToJSX(child, stateMap, depth + 1))
     .join('');
 
-  const selfClosing = ['img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'param', 'source', 'track', 'wbr'].includes(tagName);
+  const selfClosing = ['img', 'input', 'br', 'hr', 'source', 'track', 'wbr', 'area', 'base', 'col', 'embed', 'param'].includes(tagName);
   
   if (selfClosing) return `<${tagName} ${attributes.join(' ')} />`;
   return `<${tagName} ${attributes.join(' ')}>${children}</${tagName}>`;
@@ -156,10 +167,6 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
     .map(s => s.textContent)
     .join('\n')).trim();
 
-  const scripts = Array.from(doc.querySelectorAll('script'))
-    .map(s => s.textContent)
-    .join('\n');
-
   // Inject current theme HSL values into THEME_VARIABLES string
   let themedVariables = THEME_VARIABLES;
   if (theme) {
@@ -173,6 +180,7 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
   const stateMap = new Map<HTMLElement, StateInfo>();
   const globalStates: StateInfo[] = [];
 
+  // INFERENCE ENGINE: Identify interactive state patterns
   const allInputs = body.querySelectorAll('input, textarea, select');
   allInputs.forEach((el, idx) => {
     const input = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -197,29 +205,49 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
     globalStates.push(s);
   });
 
+  // STRUCTURAL INFERENCE: Decompose into semantic sub-components
   const subComponents: { name: string, jsx: string }[] = [];
-  const rootElements = Array.from(body.children).filter(el => el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE');
   
-  rootElements.forEach((el, index) => {
-    const htmlEl = el as HTMLElement;
-    const tagName = htmlEl.tagName.toLowerCase();
-    let componentName = toPascalCase(htmlEl.id || htmlEl.getAttribute('aria-label') || `${tagName}_${index + 1}`);
+  // We look for significant landmarks or high-level containers
+  const semanticContainers = body.querySelectorAll('header, footer, main, nav, section, article, aside');
+  const processedElements = new Set<Node>();
+
+  const extractComponent = (el: HTMLElement, index: number) => {
+    if (processedElements.has(el)) return;
     
-    if (subComponents.find(c => c.name === componentName)) {
-        componentName += `_${index}`;
+    const tagName = el.tagName.toLowerCase();
+    const identifier = el.id || el.getAttribute('aria-label') || el.getAttribute('role') || tagName;
+    let componentName = toPascalCase(`${identifier}_${index + 1}`);
+    
+    // Ensure uniqueness
+    let counter = 1;
+    while (subComponents.find(c => c.name === componentName)) {
+      componentName = toPascalCase(`${identifier}_${index + 1}_${counter++}`);
     }
 
-    const jsx = elementToJSX(htmlEl, stateMap);
+    const jsx = elementToJSX(el, stateMap);
     subComponents.push({ name: componentName, jsx });
+    processedElements.add(el);
+  };
+
+  // 1. First pass: Explicit semantic tags
+  Array.from(semanticContainers).forEach((el, i) => extractComponent(el as HTMLElement, i));
+
+  // 2. Second pass: Top-level orphaned elements
+  Array.from(body.children).forEach((el, i) => {
+    if (el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE' && !processedElements.has(el)) {
+      extractComponent(el as HTMLElement, i + 100);
+    }
   });
 
-  const initialFormData = globalStates.map(s => `    ${s.name}: ${s.initialValue},`).join('\n');
+  const initialState = globalStates.map(s => `    ${s.name}: ${s.initialValue},`).join('\n');
 
   const subComponentCode = subComponents.map(comp => `
 /**
- * ${comp.name} Component
+ * @component ${comp.name}
+ * Semantic sub-structure inferred from artifact source.
  */
-const ${comp.name} = ({ formData, handleInputChange }: { formData: any, handleInputChange: (name: string, value: any) => void }) => {
+const ${comp.name} = ({ uiState, updateState }: { uiState: any, updateState: (name: string, value: any) => void }) => {
   return (
     ${comp.jsx}
   );
@@ -227,17 +255,25 @@ const ${comp.name} = ({ formData, handleInputChange }: { formData: any, handleIn
 `).join('\n');
 
   return `
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import React, { useEffect, useState, useCallback } from 'react';
 
 /**
  * ${safeName} Component
  * ---------------------------------------------------------
- * Transmuted by Manifest Engine v3.1 (Production)
- * Advanced HTML-to-React conversion with consolidated state 
- * management and semantic component decomposition.
+ * Transmuted by Manifest Engine v4.0 (Production-Grade)
+ * Performs semantic decomposition and centralized state inference.
+ * 
+ * Instructions:
+ * 1. Ensure Tailwind CSS is installed in your project.
+ * 2. This file contains both component logic and encapsulated styles.
+ * 3. Reactive state is automatically mapped to discovered form elements.
  */
 
-const GLOBAL_STYLES = \`
+const STYLES = \`
 ${themedVariables}
 ${styles}
 \`;
@@ -247,39 +283,40 @@ ${subComponentCode}
 export default function ${safeName}() {
   const [isMounted, setIsMounted] = useState(false);
   
-  /* Consolidated Form State */
-  const [formData, setFormData] = useState({
-${initialFormData}
+  /* DISCOVERED UI STATE */
+  const [uiState, setUiState] = useState({
+${initialState}
   });
 
-  const handleInputChange = useCallback((name: string, value: any) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+  /**
+   * Updates centralized UI state with specific value transmutations.
+   */
+  const updateState = useCallback((name: string, value: any) => {
+    setUiState(prev => ({ ...prev, [name]: value }));
+    console.debug(\`[${safeName}] State Mutation: \${name} ->\`, value);
   }, []);
 
   useEffect(() => {
     setIsMounted(true);
-    
-    /* Injected Legacy Logic */
-    try {
-      ${scripts ? scripts.split('\n').map(line => '      ' + line).join('\n') : '// No legacy logic segments detected.'}
-    } catch (error) {
-      console.error("[${safeName}] Initialization Fault:", error);
-    }
+    console.log("[${safeName}] Manifest Surface Initialized");
   }, []);
 
   return (
-    <div className="manifest-app-root min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <style dangerouslySetInnerHTML={{ __html: GLOBAL_STYLES }} />
+    <div className="${safeName.toLowerCase()}-root min-h-screen">
+      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
       
-      <main className="manifest-viewport manifest-prose antialiased text-manifest-main bg-manifest-primary">
-        ${subComponents.map(c => `<${c.name} formData={formData} handleInputChange={handleInputChange} />`).join('\n        ')}
+      <main className="manifest-prose antialiased text-manifest-main bg-manifest-primary">
+        ${subComponents.map(c => `<${c.name} uiState={uiState} updateState={updateState} />`).join('\n        ')}
       </main>
 
+      {/* Mounting Overlay */}
       {!isMounted && (
-        <div className="fixed inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999]">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-10 h-10 border-[3px] border-manifest-accent border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 animate-pulse">Initializing Surface</span>
+        <div className="fixed inset-0 bg-[#09090b] flex items-center justify-center z-[9999]">
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-12 h-12 border-t-2 border-manifest-accent rounded-full animate-spin"></div>
+            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600 animate-pulse">
+              Manifesting React Surface
+            </span>
           </div>
         </div>
       )}

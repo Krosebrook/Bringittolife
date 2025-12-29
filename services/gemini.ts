@@ -69,6 +69,11 @@ class GeminiService {
 
   async refineArtifact(history: ChatMessage[], newPrompt: string, persona: DesignPersona = 'modernist'): Promise<{ html: string; grounding?: any[] }> {
     const ai = this.getClient();
+    const chatHistory = history.map(h => ({
+      role: h.role === 'user' ? 'user' : 'model',
+      parts: [{ text: h.text }]
+    }));
+
     const chat = ai.chats.create({
       model: 'gemini-3-pro-preview',
       config: {
@@ -76,10 +81,7 @@ class GeminiService {
         tools: [{ googleSearch: {} }],
         thinkingConfig: { thinkingBudget: 4000 }
       },
-      history: history.map(h => ({
-        role: h.role === 'user' ? 'user' : 'model',
-        parts: [{ text: h.text }]
-      }))
+      history: chatHistory
     });
 
     const response = await chat.sendMessage({ message: newPrompt });
@@ -96,9 +98,17 @@ class GeminiService {
       contents: { parts: [{ text: `High-fidelity, award-winning UI/UX mockup for: ${prompt}. Cinematic lighting, 4K detail, professional color grading.` }] }
     });
     
-    const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-    if (!part?.inlineData) throw new Error("Visual synthesis failed.");
-    return { base64: part.inlineData.data, mimeType: part.inlineData.mimeType || 'image/png' };
+    // Nano banana models may contain both image and text parts
+    const candidate = response.candidates?.[0];
+    if (!candidate) throw new Error("Synthesis candidate missing.");
+    
+    const part = candidate.content.parts.find(p => p.inlineData);
+    if (!part?.inlineData) throw new Error("Visual synthesis failed: Image part not found.");
+    
+    return { 
+      base64: part.inlineData.data, 
+      mimeType: part.inlineData.mimeType || 'image/png' 
+    };
   }
 
   private extractRobustHtml(text: string): string {

@@ -40,8 +40,8 @@ export interface AccessibilityIssue {
 
 export interface WorkflowDoc {
   purpose: string;
-  ioSchema: string; // JSON String
-  internalLogic: string; // Markdown
+  ioSchema: string;
+  internalLogic: string;
   lastUpdated: string;
 }
 

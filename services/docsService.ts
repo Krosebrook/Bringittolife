@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -11,29 +12,39 @@ export class DocsService {
     
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate comprehensive technical documentation for this HTML/Tailwind component: 
+      contents: `Synthesize a high-fidelity technical manifesto for this manifestation: 
       
-      Name: ${name}
-      Code Fragment: ${html.slice(0, 5000)}`,
+      Project Name: ${name}
+      Source Logic: ${html.slice(0, 5000)}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            purpose: { type: Type.STRING, description: "A high-level human-readable description." },
-            ioSchema: { type: Type.STRING, description: "Expected inputs and outputs in JSON Schema format." },
-            internalLogic: { type: Type.STRING, description: "Step-by-step logic explanation in Markdown." }
+            purpose: { type: Type.STRING, description: "A high-level architectural overview." },
+            ioSchema: { type: Type.STRING, description: "Component interface schema in JSON format." },
+            internalLogic: { type: Type.STRING, description: "Step-by-step runtime logic in Markdown." }
           },
           required: ["purpose", "ioSchema", "internalLogic"]
         }
       }
     });
 
-    const data = JSON.parse(response.text || "{}");
-    return {
-      ...data,
-      lastUpdated: new Date().toISOString()
-    };
+    try {
+      const data = JSON.parse(response.text || "{}");
+      return {
+        ...data,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (e) {
+      console.error("[Manifest] Doc Synthesis Fault:", e);
+      return {
+        purpose: "Documentation synthesis failed for this artifact.",
+        ioSchema: "{}",
+        internalLogic: "Error during parsing.",
+        lastUpdated: new Date().toISOString()
+      };
+    }
   }
 }
 

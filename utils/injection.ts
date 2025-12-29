@@ -249,6 +249,40 @@ export const ACCESSIBILITY_AUDIT_SCRIPT = `
         }
       });
 
+      // 5. Check Heading Hierarchy
+      const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+      let lastLevel = 0;
+      headings.forEach((h, i) => {
+        const level = parseInt(h.tagName.substring(1));
+        if (level > lastLevel + 1 && lastLevel !== 0) {
+          issues.push({
+            id: 'heading-hierarchy-' + i,
+            type: 'warning',
+            element: h.tagName.toLowerCase(),
+            message: 'Skipped heading level.',
+            suggestion: 'Headings should follow a sequential hierarchy (e.g., h1 followed by h2, not h3).',
+            selector: h.tagName.toLowerCase() + ':nth-of-type(' + (i+1) + ')'
+          });
+        }
+        lastLevel = level;
+      });
+
+      // 6. Check Touch Target Sizes
+      const targets = document.querySelectorAll('button, a, input[type="button"], input[type="submit"]');
+      targets.forEach((el, i) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0 && (rect.width < 44 || rect.height < 44)) {
+          issues.push({
+            id: 'touch-target-' + i,
+            type: 'warning',
+            element: el.tagName.toLowerCase(),
+            message: 'Small touch target.',
+            suggestion: 'Interactive elements should be at least 44x44px for optimal mobile accessibility.',
+            selector: el.id ? '#' + el.id : el.tagName.toLowerCase() + ':nth-of-type(' + (i+1) + ')'
+          });
+        }
+      });
+
       window.parent.postMessage({ type: 'accessibility-audit', issues }, '*');
     }
 

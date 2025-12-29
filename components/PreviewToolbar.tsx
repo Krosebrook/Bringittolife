@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -99,6 +100,19 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                                     className={`p-2.5 rounded-lg transition-all ${showSplitView && activeSidePanel === 'docs' ? 'bg-zinc-700 text-white shadow-inner' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40'}`}
                                 >
                                     <DocumentTextIcon className="w-4.5 h-4.5" />
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Accessibility Audit" side="bottom">
+                                <button 
+                                    onClick={() => onToggleSidePanel?.('accessibility')}
+                                    className={`relative p-2.5 rounded-lg transition-all ${showSplitView && activeSidePanel === 'accessibility' ? 'bg-zinc-700 text-white shadow-inner' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40'}`}
+                                >
+                                    <ShieldCheckIcon className="w-4.5 h-4.5" />
+                                    {accessibilityCount > 0 && (
+                                      <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-amber-500 text-zinc-950 text-[9px] font-black flex items-center justify-center rounded-full ring-2 ring-[#0c0c0e]">
+                                        {accessibilityCount}
+                                      </span>
+                                    )}
                                 </button>
                             </Tooltip>
                             <Tooltip content="Pipeline (CI/CD)" side="bottom">

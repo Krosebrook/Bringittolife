@@ -14,11 +14,15 @@ export const PWAInstaller: React.FC = () => {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(registration => {
-          console.debug('[Manifest SW] Registered:', registration.scope);
-        }).catch(error => {
-          console.error('[Manifest SW] Registration failed:', error);
-        });
+        // Use relative path to support subpath deployments and preview environments
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.debug('[Manifest SW] Registered:', registration.scope);
+          })
+          .catch(error => {
+            // Downgrade to warning as SW might be blocked in sandboxed previews
+            console.warn('[Manifest SW] Service Worker registration skipped:', error.message);
+          });
       });
     }
   }, []);

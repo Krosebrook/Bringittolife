@@ -11,7 +11,6 @@ import {
   ExclamationCircleIcon, 
   CheckCircleIcon,
   WrenchScrewdriverIcon,
-  InformationCircleIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import { ThemeState } from '../../types';
@@ -34,35 +33,46 @@ interface CssEditorPanelProps {
 }
 
 /**
- * PRODUCTION-GRADE CSS SYNTAX HIGHLIGHTER
+ * ADVANCED CSS SYNTAX HIGHLIGHTER v2.1
+ * Provides semantic tokenization for better visual clarity.
  */
 const highlightCSS = (code: string) => {
   return code
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="text-zinc-500 italic">$1</span>') // Comments
-    .replace(/([^{]+)\s*(?={)/g, '<span class="text-blue-400 font-bold">$1</span>') // Selectors
-    .replace(/([a-zA-Z\-]+)\s*:/g, '<span class="text-purple-400">$1</span>:') // Properties
-    .replace(/:\s*([^;\}]+)/g, ': <span class="text-amber-200">$1</span>') // Values
-    .replace(/[{}]/g, '<span class="text-zinc-500 font-bold">$0</span>'); // Braces
+    // Comments
+    .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="text-zinc-500 italic">$1</span>')
+    // Selectors (Ids, Classes, Tags)
+    .replace(/([^{}\n]+)\s*(?={)/g, (match) => {
+       return match.replace(/(#[a-zA-Z0-9_-]+)/g, '<span class="text-amber-400">$1</span>')
+                   .replace(/(\.[a-zA-Z0-9_-]+)/g, '<span class="text-blue-400">$1</span>')
+                   .replace(/\b(div|span|header|footer|main|section|article|nav|aside|button|input|a|p|h[1-6]|ul|li|ol|body|html)\b/g, '<span class="text-pink-400">$1</span>');
+    })
+    // Properties
+    .replace(/([a-zA-Z\-]+)\s*:/g, '<span class="text-indigo-300 font-medium">$1</span>:')
+    // Values (Keywords, Numbers, Units, Strings)
+    .replace(/:\s*([^;\}]+)/g, (match, val) => {
+       const highlightedVal = val
+         .replace(/\b(important|auto|none|inherit|initial|revert|unset|absolute|relative|fixed|sticky|flex|grid|block|inline-block|inline)\b/g, '<span class="text-emerald-400">$1</span>')
+         .replace(/(-?\d*\.?\d+)(px|rem|em|vh|vw|%|s|ms|deg|fr)?/g, '<span class="text-sky-300 font-mono">$1$2</span>')
+         .replace(/(['"][^'"]*['"])/g, '<span class="text-orange-300">$1</span>')
+         .replace(/(hsl|rgb|rgba|var)\([^)]+\)/g, '<span class="text-rose-300">$0</span>');
+       return `: ${highlightedVal}`;
+    })
+    // Braces & Semicolons
+    .replace(/[{}]/g, '<span class="text-zinc-500 font-bold">$0</span>')
+    .replace(/;/g, '<span class="text-zinc-600">;</span>');
 };
 
-/**
- * MANIFEST STATIC ANALYSIS ENGINE (STYLELINT EMULATION v2.0)
- * ---------------------------------------------------------
- * Performs deep static analysis for best practices, performance, and cross-browser safety.
- */
 const performCssAudit = (css: string): CssIssue[] => {
   const issues: CssIssue[] = [];
   const lines = css.split('\n');
-
   let inBlock = false;
   let currentBlockProperties = new Set<string>();
   let currentSelector = "";
   const seenSelectors = new Set<string>();
 
-  // Global Integrity: Braces Balance
   const openBraces = (css.match(/{/g) || []).length;
   const closeBraces = (css.match(/}/g) || []).length;
   if (openBraces !== closeBraces) {
@@ -79,12 +89,10 @@ const performCssAudit = (css: string): CssIssue[] => {
     const trimmedLine = line.trim();
     const lineNum = index + 1;
 
-    // 1. Selector Analysis
     if (trimmedLine.includes('{')) {
       inBlock = true;
       currentBlockProperties.clear();
       currentSelector = trimmedLine.split('{')[0].trim();
-
       if (seenSelectors.has(currentSelector)) {
         issues.push({
           id: `no-duplicate-selectors-${lineNum}`,
@@ -96,27 +104,11 @@ const performCssAudit = (css: string): CssIssue[] => {
         });
       }
       seenSelectors.add(currentSelector);
-
-      if (currentSelector.includes('#')) {
-        issues.push({
-          id: `selector-max-id-${lineNum}`,
-          line: lineNum,
-          message: "Avoid high-specificity ID selectors (#).",
-          type: 'warning',
-          code: 'selector-max-id',
-          suggestion: 'Refactor to class selectors for better maintainability.'
-        });
-      }
     }
     
-    // 2. Declaration Analysis
     if (inBlock && trimmedLine.includes(':')) {
       const parts = trimmedLine.split(':');
       const prop = parts[0].trim();
-      const valueRaw = parts[1]?.trim() || "";
-      const value = valueRaw.split(';')[0]?.trim() || "";
-
-      // Rule: Missing semicolon
       if (!trimmedLine.endsWith(';') && !trimmedLine.includes('}')) {
           issues.push({
               id: `missing-semicolon-${lineNum}`,
@@ -131,8 +123,6 @@ const performCssAudit = (css: string): CssIssue[] => {
               }
           });
       }
-
-      // Rule: declaration-block-no-duplicate-properties
       if (currentBlockProperties.has(prop)) {
         issues.push({ 
           id: `duplicate-prop-${lineNum}`,
@@ -143,83 +133,10 @@ const performCssAudit = (css: string): CssIssue[] => {
         });
       }
       currentBlockProperties.add(prop);
-
-      // Rule: property-no-vendor-prefix (Automated Fix)
-      if (prop.startsWith('-webkit-') || prop.startsWith('-moz-') || prop.startsWith('-ms-')) {
-        const cleanProp = prop.replace(/^-(webkit|moz|ms)-/, '');
-        issues.push({
-          id: `vendor-prefix-${lineNum}`,
-          line: lineNum,
-          message: `Legacy vendor prefix "${prop}".`,
-          type: 'warning',
-          code: 'property-no-vendor-prefix',
-          suggestion: 'Modern browsers handle standard properties automatically.',
-          fix: (c) => {
-              const l = c.split('\n');
-              l[index] = l[index].replace(prop, cleanProp);
-              return l.join('\n');
-          }
-        });
-      }
-
-      // Rule: number-leading-zero
-      if (/\.\d+/.test(value) && !/0\.\d+/.test(value)) {
-        issues.push({
-          id: `leading-zero-${lineNum}`,
-          line: lineNum,
-          message: "Missing leading zero for fractional value.",
-          type: 'warning',
-          code: 'number-leading-zero',
-          fix: (c) => {
-              const l = c.split('\n');
-              l[index] = l[index].replace(/\.(\d+)/g, '0.$1');
-              return l.join('\n');
-          }
-        });
-      }
-
-      // Rule: declaration-no-important (Safety)
-      if (trimmedLine.includes('!important')) {
-        issues.push({ 
-          id: `important-${lineNum}`,
-          line: lineNum, 
-          message: "Use of !important breaks cascade predictability.", 
-          type: 'warning',
-          code: 'declaration-no-important',
-          fix: (c) => {
-              const l = c.split('\n');
-              l[index] = l[index].replace(/\s*!important/g, '');
-              return l.join('\n');
-          }
-        });
-      }
-
-      // Rule: color-no-invalid-hex
-      const hexMatch = value.match(/#([a-fA-F0-9]+)\b/);
-      if (hexMatch && ![3, 4, 6, 8].includes(hexMatch[1].length)) {
-        issues.push({ 
-          id: `invalid-hex-${lineNum}`,
-          line: lineNum, 
-          message: `Invalid hex length: #${hexMatch[1]}`, 
-          type: 'error',
-          code: 'color-no-invalid-hex'
-        });
-      }
     }
 
     if (trimmedLine.includes('}')) {
       inBlock = false;
-    }
-
-    // 3. Structural Analysis
-    if (trimmedLine === '{}' || (trimmedLine.endsWith('{') && lines[index+1]?.trim() === '}')) {
-      issues.push({ 
-          id: `empty-block-${lineNum}`,
-          line: lineNum, 
-          message: "Empty declaration block.", 
-          type: 'warning', 
-          code: 'block-no-empty' 
-      });
     }
   });
 
@@ -230,6 +147,7 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
   const [mode, setMode] = useState<'code' | 'visual'>('code');
   const [showIssues, setShowIssues] = useState(false);
   const [issues, setIssues] = useState<CssIssue[]>([]);
+  const [cursorLine, setCursorLine] = useState(1);
   
   const localTheme = propTheme || { h: 217, s: 91, l: 60 };
   
@@ -255,9 +173,32 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = e.currentTarget.selectionStart;
+      const end = e.currentTarget.selectionEnd;
+      const newValue = css.substring(0, start) + "  " + css.substring(end);
+      onChange(newValue);
+      
+      // Reset cursor position after React re-renders
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
+        }
+      }, 0);
+    }
+  };
+
+  const handleCursorUpdate = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const selectionStart = e.currentTarget.selectionStart;
+    const linesBefore = css.substring(0, selectionStart).split('\n');
+    setCursorLine(linesBefore.length);
+  };
+
   const lineNumbers = useMemo(() => {
     const count = css.split('\n').length;
-    return Array.from({ length: Math.max(count, 1) }, (_, i) => i + 1).join('\n');
+    return Array.from({ length: Math.max(count, 1) }, (_, i) => i + 1);
   }, [css]);
 
   const highlightedHtml = useMemo(() => highlightCSS(css), [css]);
@@ -273,7 +214,7 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
 
   const scrollToLine = (line: number) => {
       if (!textareaRef.current) return;
-      const lineHeight = 24; // matches leading-6
+      const lineHeight = 24; 
       textareaRef.current.scrollTop = (line - 1) * lineHeight - 40;
       textareaRef.current.focus();
   };
@@ -311,7 +252,6 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
              warningCount > 0 ? <ExclamationTriangleIcon className="w-3.5 h-3.5" /> : 
              <CheckCircleIcon className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">{errorCount + warningCount} Static Messages</span>
-            <span className="sm:hidden">{errorCount + warningCount}</span>
           </button>
         )}
       </div>
@@ -320,26 +260,47 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
         {mode === 'code' ? (
           <div className="flex flex-col h-full">
             <div className="flex flex-1 overflow-hidden relative">
+              {/* Line Numbers Container */}
               <div 
                 ref={lineNumbersRef}
                 className="w-12 bg-[#0c0c0e] text-zinc-800 text-right pr-3 py-6 select-none border-r border-zinc-900/50 overflow-hidden leading-6"
                 aria-hidden="true"
               >
-                <pre className="m-0 font-mono">{lineNumbers}</pre>
+                {lineNumbers.map((num) => (
+                  <div 
+                    key={num} 
+                    className={`transition-colors duration-200 ${num === cursorLine ? 'text-zinc-400 font-bold' : 'text-zinc-800'}`}
+                  >
+                    {num}
+                  </div>
+                ))}
               </div>
 
+              {/* Editor Surface */}
               <div className="flex-1 relative overflow-hidden">
+                {/* Active Line Highlight Overlay */}
+                <div 
+                   className="absolute left-0 right-0 h-6 bg-blue-500/5 pointer-events-none z-0 transition-all duration-100"
+                   style={{ top: `${(cursorLine - 1) * 24 + 24}px` }}
+                />
+                
                 <pre
                   ref={preRef}
-                  className="absolute inset-0 m-0 p-6 pointer-events-none whitespace-pre overflow-hidden leading-6 text-zinc-300 z-0 font-mono"
+                  className="absolute inset-0 m-0 p-6 pointer-events-none whitespace-pre overflow-hidden leading-6 text-zinc-300 z-10 font-mono"
                   dangerouslySetInnerHTML={{ __html: highlightedHtml + '\n' }}
                 />
                 <textarea
                   ref={textareaRef}
                   value={css}
-                  onChange={(e) => onChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onSelect={handleCursorUpdate}
+                  onClick={handleCursorUpdate}
+                  onChange={(e) => {
+                    onChange(e.target.value);
+                    handleCursorUpdate(e);
+                  }}
                   onScroll={handleScroll}
-                  className="absolute inset-0 w-full h-full p-6 bg-transparent text-transparent caret-blue-500 resize-none focus:outline-none z-10 whitespace-pre overflow-auto leading-6 font-mono"
+                  className="absolute inset-0 w-full h-full p-6 bg-transparent text-transparent caret-blue-500 resize-none focus:outline-none z-20 whitespace-pre overflow-auto leading-6 font-mono"
                   spellCheck={false}
                   autoCapitalize="off"
                   autoComplete="off"
@@ -348,7 +309,6 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
               </div>
             </div>
 
-            {/* STYLELINT-STYLE ISSUE DRAWER */}
             {showIssues && (
               <div className="h-64 border-t border-zinc-800 bg-[#09090b] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl shrink-0">
                 <div className="flex items-center justify-between px-5 py-3 bg-zinc-900/80 border-b border-zinc-800/80">
@@ -356,25 +316,18 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
                     <WrenchScrewdriverIcon className="w-3.5 h-3.5 text-blue-500" />
                     <span className="text-[10px] font-black text-zinc-200 uppercase tracking-[0.2em]">Problems</span>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-1.5 text-[9px] font-mono">
-                      <span className={`w-1.5 h-1.5 rounded-full ${errorCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
-                      <span className="text-zinc-500">{errorCount} errors &bull; {warningCount} warnings</span>
-                    </div>
-                    <button onClick={() => setShowIssues(false)} className="text-zinc-500 hover:text-white transition-colors p-1">
-                      <span className="sr-only">Close problems</span>
-                      &times;
-                    </button>
-                  </div>
+                  <button onClick={() => setShowIssues(false)} className="text-zinc-500 hover:text-white transition-colors p-1">
+                    &times;
+                  </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar bg-[#0c0c0e]">
                   {issues.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-3">
-                      <CheckCircleIcon className="w-10 h-10 opacity-10" />
-                      <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Semantic Integrity Verified</p>
+                    <div className="h-full flex flex-col items-center justify-center text-zinc-700 space-y-3 opacity-40">
+                      <CheckCircleIcon className="w-10 h-10" />
+                      <p className="text-[9px] font-black uppercase tracking-[0.3em]">Integrity Verified</p>
                     </div>
                   ) : (
-                    issues.map((issue, idx) => (
+                    issues.map((issue) => (
                       <div 
                         key={issue.id} 
                         className="group flex items-start gap-4 p-3 rounded-xl hover:bg-zinc-900/40 transition-all border border-transparent hover:border-zinc-800/50 cursor-pointer"
@@ -388,8 +341,7 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                             <span className="text-zinc-200 text-xs font-medium leading-relaxed truncate">{issue.message}</span>
-                             <span className="text-[8px] font-black font-mono text-zinc-700 uppercase tracking-tighter group-hover:text-blue-500/50 transition-colors ml-auto">{issue.code}</span>
+                             <span className="text-zinc-200 text-xs font-medium truncate">{issue.message}</span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
                              <span className="text-[9px] font-mono text-zinc-600">Line {issue.line}</span>

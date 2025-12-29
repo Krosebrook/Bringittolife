@@ -110,8 +110,19 @@ const assembleIframeDoc = (rawHtml: string): string => {
    */
   const cleanHtml = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
   
-  // Ensure the body has the manifest-prose class for automatic high-quality typography.
-  const processedHtml = cleanHtml.replace(/<body([^>]*)>/i, '<body$1 class="manifest-prose">');
+  /**
+   * TYPOGRAPHY INJECTION: 
+   * Ensure the body carries the manifest-prose class to trigger 
+   * automatic high-fidelity typography on semantic tags.
+   */
+  let processedHtml = cleanHtml;
+  if (processedHtml.toLowerCase().includes('<body')) {
+    if (processedHtml.match(/<body[^>]*class=["']/i)) {
+      processedHtml = processedHtml.replace(/(<body[^>]*class=["'])/i, '$1manifest-prose ');
+    } else {
+      processedHtml = processedHtml.replace(/(<body)/i, '$1 class="manifest-prose"');
+    }
+  }
   
   if (processedHtml.toLowerCase().includes('</head>')) {
     return processedHtml.replace(/<\/head>/i, `${allInjections}\n</head>`);

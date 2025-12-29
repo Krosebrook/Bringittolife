@@ -56,8 +56,20 @@ export const SUBTLE_BACKGROUND_STYLE = `
       background-attachment: fixed;
     }
 
+    /**
+     * SEMANTIC TYPOGRAPHY ENGINE (Tailwind Typography Plugin)
+     * Automatically styles semantic HTML (h1, p, ul, etc.)
+     */
     .manifest-prose {
-      @apply prose prose-zinc dark:prose-invert max-w-none prose-headings:font-black prose-headings:tracking-tighter prose-p:leading-relaxed prose-a:no-underline hover:prose-a:underline;
+      @apply prose prose-slate dark:prose-invert max-w-none;
+      @apply prose-headings:font-black prose-headings:tracking-tight prose-headings:text-manifest-main;
+      @apply prose-p:text-manifest-sub prose-p:leading-relaxed;
+      @apply prose-a:text-manifest-accent prose-a:no-underline hover:prose-a:underline;
+      @apply prose-strong:text-manifest-main prose-code:text-manifest-accent;
+      @apply prose-blockquote:border-l-manifest-accent prose-blockquote:italic;
+      @apply prose-ul:list-disc prose-ol:list-decimal;
+
+      /* Dynamic Theme Variable Mapping */
       --tw-prose-body: var(--manifest-text-main);
       --tw-prose-headings: var(--manifest-text-main);
       --tw-prose-lead: var(--manifest-text-sub);

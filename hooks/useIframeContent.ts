@@ -10,16 +10,12 @@ import { INTERACTIVE_STYLES, SUBTLE_BACKGROUND_STYLE, THEME_VARIABLES, DRAG_SCRI
 /**
  * PRODUCTION-GRADE IFRAME ARCHITECT
  * ---------------------------------------------------------
- * This function constructs the runtime environment for the generated artifacts.
- * It implements a "Design System Bridge" that connects the CSS variables in the
- * host app to the Tailwind CSS engine inside the iframe.
+ * Connects the host application design system to the Tailwind CSS typography engine.
+ * Strips incoming styles to ensure the editor's Custom CSS is the single source of truth.
  */
 const assembleIframeDoc = (rawHtml: string): string => {
-  // Purge any existing style tags from the raw artifact to prevent "ghost styles"
-  // and ensure the CSS Editor remains the single source of truth for the final design.
-  const cleanedHtml = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
-  
-  const headInjections = [
+  // 1. Core Meta and Frameworks
+  const baseInjections = [
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     '<!-- Tailwind Play CDN -->',
@@ -51,68 +47,38 @@ const assembleIframeDoc = (rawHtml: string): string => {
     '          "manifest-lg": "var(--manifest-radius-lg)",',
     '          "manifest-xl": "var(--manifest-radius-xl)",',
     '        },',
-    '        transitionTimingFunction: {',
-    '          "manifest": "var(--manifest-ease)",',
-    '        },',
+    '        transitionTimingFunction: { "manifest": "var(--manifest-ease)" },',
     '        boxShadow: {',
     '          "manifest-sm": "var(--manifest-shadow-sm)",',
     '          "manifest-md": "var(--manifest-shadow-md)",',
     '        },',
-    '        typography: ({ theme }) => ({',
-    '          zinc: {',
-    '            css: {',
-    '              "--tw-prose-body": "var(--manifest-text-main)",',
-    '              "--tw-prose-headings": "var(--manifest-text-main)",',
-    '              "--tw-prose-lead": "var(--manifest-text-sub)",',
-    '              "--tw-prose-links": "var(--manifest-accent)",',
-    '              "--tw-prose-bold": "var(--manifest-text-main)",',
-    '              "--tw-prose-counters": "var(--manifest-text-muted)",',
-    '              "--tw-prose-bullets": "var(--manifest-text-muted)",',
-    '              "--tw-prose-hr": "var(--manifest-border)",',
-    '              "--tw-prose-quotes": "var(--manifest-text-main)",',
-    '              "--tw-prose-quote-borders": "var(--manifest-accent)",',
-    '              "--tw-prose-captions": "var(--manifest-text-muted)",',
-    '              "--tw-prose-code": "var(--manifest-text-main)",',
-    '              "--tw-prose-pre-code": "var(--manifest-text-inverse)",',
-    '              "--tw-prose-pre-bg": "var(--manifest-text-main)",',
-    '              "--tw-prose-th-borders": "var(--manifest-border)",',
-    '              "--tw-prose-td-borders": "var(--manifest-border)",',
-    '            },',
-    '          },',
-    '        }),',
     '      }',
     '    }',
     '  }',
-    '</script>',
-    
-    '<!-- LAYER 1: Core System & Brand Identity Variables -->',
+    '</script>'
+  ];
+
+  // 2. Theming and Foundations
+  const foundationInjections = [
+    '<!-- Core Design Variables (Applied First) -->',
     `<style id="layer-variables">${THEME_VARIABLES}</style>`,
     `<style id="layer-theme-studio"></style>`,
-    
-    '<!-- LAYER 2 & 3: Framework Foundation & Interactive Patterns -->',
+    '<!-- Framework Foundations -->',
     SUBTLE_BACKGROUND_STYLE,
     INTERACTIVE_STYLES,
+  ];
 
-    '<!-- LAYER 4: The Final Override (Highest Precedence) -->',
-    '<!-- This block handles custom CSS from the editor, injected at runtime. -->',
-    '<!-- It uses type="text/tailwindcss" so users can use @apply and other Tailwind directives. -->',
+  // 3. User Custom Overrides (Applied Last for Priority)
+  const overrideInjections = [
+    '<!-- User Custom CSS Overlay (Highest Priority) -->',
     `<style type="text/tailwindcss" id="layer-user-patch"></style>`,
-
     `<script>
-      /**
-       * DESIGN SYNCHRONIZATION BRIDGE
-       * Listens for messages from the host to update styles and themes without reloading.
-       */
       window.addEventListener('message', (event) => {
         const { type, css, h, s, l, command } = event.data || {};
         
         if (type === 'update-css') {
           const patchLayer = document.getElementById('layer-user-patch');
-          if (patchLayer) {
-            // Update the CSS content. Tailwind's Play CDN automatically re-processes 
-            // when it detects a change in a <style type="text/tailwindcss"> tag.
-            patchLayer.innerHTML = css;
-          }
+          if (patchLayer) patchLayer.innerHTML = css;
         }
         
         if (type === 'update-theme') {
@@ -134,14 +100,24 @@ const assembleIframeDoc = (rawHtml: string): string => {
     </script>`,
     DRAG_SCRIPT,
     ACCESSIBILITY_AUDIT_SCRIPT
-  ].join('\n    ');
+  ];
 
-  // Inject at the end of <head> for maximum CSS specificity over any model-generated remnants
-  if (cleanedHtml.toLowerCase().includes('</head>')) {
-    return cleanedHtml.replace(/<\/head>/i, `${headInjections}\n</head>`);
+  const allInjections = [...baseInjections, ...foundationInjections, ...overrideInjections].join('\n    ');
+
+  /**
+   * REFINEMENT: Strip existing style tags to ensure the editor's 
+   * customCss state is the authoritative source for the preview.
+   */
+  const cleanHtml = rawHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
+  
+  // Ensure the body has the manifest-prose class for automatic high-quality typography.
+  const processedHtml = cleanHtml.replace(/<body([^>]*)>/i, '<body$1 class="manifest-prose">');
+  
+  if (processedHtml.toLowerCase().includes('</head>')) {
+    return processedHtml.replace(/<\/head>/i, `${allInjections}\n</head>`);
   }
   
-  return `<!DOCTYPE html><html class="dark" lang="en"><head>${headInjections}</head><body>${cleanedHtml}</body></html>`;
+  return `<!DOCTYPE html><html class="dark" lang="en"><head>${allInjections}</head><body class="manifest-prose">${processedHtml}</body></html>`;
 };
 
 export const useIframeContent = (creation: Creation | null) => {

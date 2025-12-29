@@ -1,9 +1,8 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { Hero } from './components/Hero';
 import { InputArea } from './components/InputArea';
 import { LivePreview } from './components/LivePreview';
@@ -13,6 +12,7 @@ import { useHistory } from './hooks/useHistory';
 import { Creation } from './types';
 import { Tooltip } from './components/ui/Tooltip';
 import { useCreation } from './hooks/useCreation';
+import { PWAInstaller } from './components/ui/PWAInstaller';
 
 /**
  * THE MANIFESTATION LAB - MAIN RUNTIME
@@ -31,6 +31,19 @@ const App: React.FC = () => {
   } = useCreation(addCreation);
   
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  // Service Worker Registration
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+          console.log('[Manifest SW] Registered:', registration.scope);
+        }).catch(error => {
+          console.error('[Manifest SW] Registration failed:', error);
+        });
+      });
+    }
+  }, []);
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,6 +128,9 @@ const App: React.FC = () => {
         isFocused={isFocused}
         onReset={reset}
       />
+
+      {/* PWA INSTALLER BANNER */}
+      <PWAInstaller />
 
       {/* RECOVERY BUTTON */}
       {!isFocused && (

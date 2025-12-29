@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Creation, DeviceMode } from '../types';
+import { Creation, DeviceMode, AccessibilityIssue } from '../types';
 import { usePanZoom } from '../hooks/usePanZoom';
 import { PreviewToolbar } from './PreviewToolbar';
 import { downloadArtifact, downloadFile } from '../utils/fileHelpers';
@@ -15,7 +15,11 @@ import { SimulatorViewport } from './live/SimulatorViewport';
 import { useIframeContent } from '../hooks/useIframeContent';
 import { CssEditorPanel } from './live/CssEditorPanel';
 import { ChatPanel } from './live/ChatPanel';
+import { AccessibilityPanel } from './live/AccessibilityPanel';
+import { DocumentationPanel } from './live/DocumentationPanel';
+import { CiCdPanel } from './live/CiCdPanel';
 import { useCreation } from '../hooks/useCreation';
+import { docsService } from '../services/docsService';
 
 interface LivePreviewProps {
   creation: Creation | null;
@@ -24,7 +28,7 @@ interface LivePreviewProps {
   onReset: () => void;
 }
 
-export type SidePanelType = 'reference' | 'css' | 'chat';
+export type SidePanelType = 'reference' | 'css' | 'chat' | 'accessibility' | 'docs' | 'cicd';
 
 export const LivePreview: React.FC<LivePreviewProps> = ({ 
   creation: propCreation, 
@@ -39,7 +43,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
     const [isDragMode, setIsDragMode] = useState(false);
     const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
     const [isLandscape, setIsLandscape] = useState(false);
-    const [accessibilityIssues, setAccessibilityIssues] = useState<any[]>([]);
+    const [accessibilityIssues, setAccessibilityIssues] = useState<AccessibilityIssue[]>([]);
+    const [isSyncingDocs, setIsSyncingDocs] = useState(false);
 
     const { 
       activeCreation: internalCreation, 
@@ -49,7 +54,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       refine,
       toggleVoiceMode,
       updateTheme,
-      changePersona
+      changePersona,
+      setActiveCreation
     } = useCreation(() => {});
 
     const creation = internalCreation || propCreation;
@@ -63,7 +69,6 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const srcDoc = useIframeContent(creation);
 
-    // Listen for Accessibility Audit events from the Iframe
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
         if (event.data?.type === 'accessibility-audit') {
@@ -74,25 +79,21 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       return () => window.removeEventListener('message', handleMessage);
     }, []);
 
-    // Synchronize design extraction
     useEffect(() => {
         if (creation) {
             const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
             let extractedCss = "";
             let match;
             while ((match = styleRegex.exec(creation.html)) !== null) {
-                extractedCss += `/* Refined Artifact Styles */\n@layer utilities {\n${match[1].trim()}\n}\n\n`;
+                const styleContent = match[1].trim();
+                if (styleContent) {
+                  extractedCss += `/* Synthesized from Component Source */\n@layer utilities {\n${styleContent}\n}\n\n`;
+                }
             }
-            
             if (extractedCss) {
                 setCustomCss(extractedCss.trim());
             } else if (!customCss) {
                 setCustomCss("/* Add custom CSS or Tailwind @apply rules here */\n");
-            }
-            
-            if (creation.originalImage && !showSplitView && !internalCreation) {
-              setShowSplitView(true);
-              setActiveSidePanel('reference');
             }
         }
     }, [creation?.id]);
@@ -107,24 +108,43 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       return () => clearTimeout(timer);
     }, [customCss]);
 
-    useEffect(() => {
-      if (creation?.theme && iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({ 
-          type: 'update-theme', 
-          ...creation.theme 
-        }, '*');
-      }
-    }, [creation?.theme, creation?.id]);
-
     const handleIframeLoad = useCallback(() => {
         if (iframeRef.current?.contentWindow) {
             iframeRef.current.contentWindow.postMessage({ command: isDragMode ? 'enable-drag' : 'disable-drag' }, '*');
             iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
             if (creation?.theme) {
-              iframeRef.current.contentWindow.postMessage({ type: 'update-theme', ...creation.theme }, '*');
+              iframeRef.current.contentWindow.postMessage({ 
+                type: 'update-theme', 
+                h: creation.theme.h, 
+                s: creation.theme.s, 
+                l: creation.theme.l 
+              }, '*');
             }
         }
     }, [isDragMode, customCss, creation?.theme]);
+
+    const handleRefreshDocs = async () => {
+      if (!creation) return;
+      setIsSyncingDocs(true);
+      try {
+        const doc = await docsService.generateDocumentation(creation.name, creation.html);
+        setActiveCreation({ ...creation, documentation: doc });
+      } catch (err) {
+        console.error("Doc Sync Failed", err);
+      } finally {
+        setIsSyncingDocs(false);
+      }
+    };
+
+    const handleSuggestPipeline = () => {
+       if (!creation) return;
+       const suggested: any[] = [
+          { id: '1', name: 'Lint (Prettier)', type: 'lint', status: 'success' },
+          { id: '2', name: 'Build (Tailwind)', type: 'build', status: 'active' },
+          { id: '3', name: 'Vercel Deployment', type: 'deploy', status: 'pending' },
+       ];
+       setActiveCreation({ ...creation, pipeline: suggested });
+    };
 
     const handleCopyCode = async () => {
         if (!creation?.html) return;
@@ -136,16 +156,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         } catch (err) { console.error("[Manifest] Copy Fail:", err); }
     };
 
-    // Keyboard navigation: Escape to exit
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && isFocused && !isLoading) {
-          onReset();
-        }
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isFocused, isLoading, onReset]);
+    const handleExportReact = useCallback(() => {
+      if (!creation) return;
+      const componentName = creation.name.replace(/[^a-zA-Z0-9]/g, '');
+      const reactCode = convertToReactComponent(creation.html, componentName, customCss, creation.theme);
+      downloadFile(reactCode, `${componentName || 'ManifestedApp'}.tsx`);
+    }, [creation, customCss]);
 
     return (
       <div 
@@ -188,9 +204,10 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
           }}
           onExportPdf={() => iframeRef.current?.contentWindow?.print()}
           onExportJson={() => creation && downloadArtifact(creation, `artifact_${creation.id}.json`)}
-          onExportReact={() => creation && downloadFile(convertToReactComponent(creation.html, creation.name, customCss), `${creation.name}.tsx`)}
+          onExportReact={handleExportReact}
           onExportHtml={() => creation && downloadFile(creation.html.replace(/<\/head>/i, `<style type="text/tailwindcss">${customCss}</style>\n</head>`), `${creation.name}.html`, 'text/html')}
           onCopyCode={handleCopyCode}
+          accessibilityCount={accessibilityIssues.length}
         />
 
         <div className="relative w-full flex-1 bg-[#09090b] flex flex-col md:flex-row overflow-hidden">
@@ -222,15 +239,24 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                       persona={creation.persona || persona}
                       onPersonaChange={changePersona}
                     />
+                  ) : activeSidePanel === 'accessibility' ? (
+                    <AccessibilityPanel 
+                      issues={accessibilityIssues} 
+                      onSendMessage={(text) => refine(text)} 
+                    />
+                  ) : activeSidePanel === 'docs' ? (
+                    <DocumentationPanel 
+                      doc={creation.documentation} 
+                      onRefresh={handleRefreshDocs} 
+                      isLoading={isSyncingDocs} 
+                    />
+                  ) : activeSidePanel === 'cicd' ? (
+                    <CiCdPanel 
+                      pipeline={creation.pipeline} 
+                      onSuggest={handleSuggestPipeline} 
+                      isLoading={isLoading} 
+                    />
                   ) : null}
-                  
-                  {/* Accessibility Badge for UI context */}
-                  {accessibilityIssues.length > 0 && (
-                    <div className="absolute bottom-20 left-4 z-50 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded-md flex items-center space-x-2 animate-in fade-in slide-in-from-bottom-2">
-                       <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                       <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">{accessibilityIssues.length} Accessibility Warnings</span>
-                    </div>
-                  )}
                 </aside>
               )}
               <SimulatorViewport 

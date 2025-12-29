@@ -29,6 +29,29 @@ export interface ThemeState {
   l: number;
 }
 
+export interface AccessibilityIssue {
+  id: string;
+  type: 'critical' | 'warning' | 'info';
+  element: string;
+  message: string;
+  suggestion: string;
+  selector: string;
+}
+
+export interface WorkflowDoc {
+  purpose: string;
+  ioSchema: string; // JSON String
+  internalLogic: string; // Markdown
+  lastUpdated: string;
+}
+
+export interface PipelineStep {
+  id: string;
+  name: string;
+  type: 'lint' | 'test' | 'build' | 'deploy';
+  status: 'pending' | 'active' | 'success' | 'failed';
+}
+
 export interface Creation {
   id: string;
   name: string;
@@ -38,6 +61,8 @@ export interface Creation {
   chatHistory?: ChatMessage[];
   theme?: ThemeState;
   persona?: DesignPersona;
+  documentation?: WorkflowDoc;
+  pipeline?: PipelineStep[];
   metadata?: {
     type?: ArtifactType;
     prompt?: string;

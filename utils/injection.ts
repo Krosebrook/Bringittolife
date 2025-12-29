@@ -34,34 +34,51 @@ export const THEME_VARIABLES = `
   --manifest-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --manifest-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
+
+.dark {
+  --manifest-bg-primary: #020617;
+  --manifest-bg-secondary: #0f172a;
+  --manifest-bg-tertiary: #1e293b;
+  --manifest-bg-card: #0f172a;
+  --manifest-border: #1e293b;
+  --manifest-text-main: #f8fafc;
+  --manifest-text-sub: #94a3b8;
+  --manifest-text-muted: #64748b;
+}
 `;
 
 export const SUBTLE_BACKGROUND_STYLE = `
 <style type="text/tailwindcss">
   @layer base {
     body {
-      @apply bg-manifest-primary text-manifest-main antialiased min-h-screen m-0 
-             prose prose-zinc dark:prose-invert max-w-none;
-      background: linear-gradient(300deg, var(--manifest-bg-primary), var(--manifest-bg-secondary), var(--manifest-bg-tertiary));
-      background-size: 200% 200%;
-      animation: manifest-gradient 15s ease infinite;
-    }
-    
-    /* Ensure typography doesn't force a max-width on the app layout */
-    .prose {
-      max-width: none !important;
+      @apply bg-manifest-primary text-manifest-main antialiased min-h-screen m-0;
+      background: linear-gradient(30deg, var(--manifest-bg-primary), var(--manifest-bg-secondary));
+      background-attachment: fixed;
     }
 
-    /* Accessibility: Visible Focus States for Keyboard Navigation */
+    .manifest-prose {
+      @apply prose prose-zinc dark:prose-invert max-w-none prose-headings:font-black prose-headings:tracking-tighter prose-p:leading-relaxed prose-a:no-underline hover:prose-a:underline;
+      --tw-prose-body: var(--manifest-text-main);
+      --tw-prose-headings: var(--manifest-text-main);
+      --tw-prose-lead: var(--manifest-text-sub);
+      --tw-prose-links: var(--manifest-accent);
+      --tw-prose-bold: var(--manifest-text-main);
+      --tw-prose-counters: var(--manifest-text-muted);
+      --tw-prose-bullets: var(--manifest-text-muted);
+      --tw-prose-hr: var(--manifest-border);
+      --tw-prose-quotes: var(--manifest-text-main);
+      --tw-prose-quote-borders: var(--manifest-accent);
+      --tw-prose-captions: var(--manifest-text-muted);
+      --tw-prose-code: var(--manifest-accent);
+      --tw-prose-pre-code: var(--manifest-text-inverse);
+      --tw-prose-pre-bg: #0f172a;
+      --tw-prose-th-borders: var(--manifest-border);
+      --tw-prose-td-borders: var(--manifest-border);
+    }
+
     :focus-visible {
-      @apply outline-none ring-2 ring-manifest-accent ring-offset-2 ring-offset-manifest-primary;
+      @apply outline-none ring-2 ring-manifest-accent ring-offset-2 ring-offset-manifest-primary transition-all;
     }
-  }
-
-  @keyframes manifest-gradient {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
   }
 </style>
 `;
@@ -70,25 +87,29 @@ export const INTERACTIVE_STYLES = `
 <style type="text/tailwindcss">
   @layer components {
     .btn {
-      @apply cursor-pointer transition-all duration-200 select-none font-medium no-underline inline-flex items-center justify-center;
+      @apply cursor-pointer transition-all duration-200 select-none font-semibold no-underline inline-flex items-center justify-center px-5 py-2.5 active:scale-[0.98];
       border-radius: var(--manifest-radius-md);
     }
     
     .btn-primary {
-      @apply bg-manifest-accent text-manifest-inverse shadow-manifest-sm hover:bg-manifest-accent-hover !no-underline;
+      @apply bg-manifest-accent text-manifest-inverse shadow-manifest-md hover:bg-manifest-accent-hover !no-underline;
+    }
+
+    .btn-secondary {
+      @apply bg-manifest-bg-secondary text-manifest-main border border-manifest-border hover:bg-manifest-border !no-underline;
     }
 
     .card {
-      @apply bg-manifest-card border border-manifest-border rounded-manifest-lg shadow-manifest-sm overflow-hidden not-prose;
+      @apply bg-manifest-card border border-manifest-border rounded-manifest-lg shadow-manifest-sm overflow-hidden transition-all hover:shadow-manifest-md;
     }
   }
 
   [data-animate="true"] {
-    @apply animate-manifest-fade;
+    animation: manifest-fade-in 0.6s var(--manifest-ease) forwards;
   }
 
   @keyframes manifest-fade-in {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
   }
 </style>
@@ -143,71 +164,85 @@ export const DRAG_SCRIPT = `
 
 export const ACCESSIBILITY_AUDIT_SCRIPT = `
 <script>
-  /**
-   * MANIFEST ACCESSIBILITY GUARDIAN v2.0
-   * Audits and repairs accessibility gaps in real-time.
-   */
   (function() {
     function auditAccessibility() {
       const issues = [];
       
-      // 1. Repair Button/Link Labels
+      // 1. Check Interactive Elements for Labels
       const actions = document.querySelectorAll('button, a, [role="button"]');
-      actions.forEach(el => {
-        const label = el.innerText.trim() || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
-        if (!label) {
-          const svg = el.querySelector('svg');
-          if (svg) {
-            const svgTitle = svg.querySelector('title')?.textContent || "Action Icon";
-            el.setAttribute('aria-label', svgTitle);
-            if (!svg.getAttribute('aria-hidden')) svg.setAttribute('aria-hidden', 'true');
-          } else {
-            const fallback = el.id || el.className?.split(' ')[0] || 'Action';
-            el.setAttribute('aria-label', fallback.replace(/[-_]/g, ' '));
-            issues.push({ type: 'warning', msg: 'Button missing descriptive label.', target: el.tagName });
-          }
+      actions.forEach((el, i) => {
+        const text = el.innerText.trim();
+        const ariaLabel = el.getAttribute('aria-label');
+        const ariaLabelledBy = el.getAttribute('aria-labelledby');
+        const hasAccessibleName = text || ariaLabel || ariaLabelledBy;
+        
+        if (!hasAccessibleName) {
+          issues.push({
+            id: 'missing-label-' + i,
+            type: 'critical',
+            element: el.tagName.toLowerCase(),
+            message: 'Interactive element has no accessible name.',
+            suggestion: 'Add an aria-label attribute or inner text that describes the action.',
+            selector: el.id ? '#' + el.id : el.tagName.toLowerCase() + ':nth-child(' + (i+1) + ')'
+          });
         }
       });
 
-      // 2. Repair Image Alt Tags
+      // 2. Check Images for Alt Text
       const images = document.querySelectorAll('img');
-      images.forEach(img => {
+      images.forEach((img, i) => {
         if (!img.hasAttribute('alt')) {
-          img.setAttribute('alt', ''); // Default to decorative if missing
-          issues.push({ type: 'info', msg: 'Image missing alt attribute.', target: 'IMG' });
+          issues.push({
+            id: 'missing-alt-' + i,
+            type: 'critical',
+            element: 'img',
+            message: 'Image is missing an alt attribute.',
+            suggestion: 'Add an alt="" attribute for decorative images, or a descriptive alternative text for informative images.',
+            selector: img.id ? '#' + img.id : 'img:nth-child(' + (i+1) + ')'
+          });
         }
       });
-      
-      // 3. Form Control Labels
+
+      // 3. Check for Semantic Landmarks
+      const landmarks = ['main', 'nav', 'header', 'footer'];
+      landmarks.forEach(tag => {
+        if (!document.querySelector(tag)) {
+          issues.push({
+            id: 'missing-landmark-' + tag,
+            type: 'warning',
+            element: 'document',
+            message: 'Missing <' + tag + '> semantic landmark.',
+            suggestion: 'Wrap your content in appropriate semantic tags like <' + tag + '> to help screen reader navigation.',
+            selector: 'body'
+          });
+        }
+      });
+
+      // 4. Check Form Inputs for Labels
       const inputs = document.querySelectorAll('input, select, textarea');
-      inputs.forEach(input => {
+      inputs.forEach((input, i) => {
         const id = input.id;
-        const label = (id && document.querySelector('label[for="' + id + '"]')) || input.getAttribute('aria-label');
-        if (!label) {
-          const placeholder = input.getAttribute('placeholder');
-          if (placeholder) input.setAttribute('aria-label', placeholder);
-          issues.push({ type: 'warning', msg: 'Input missing explicit label.', target: input.tagName });
+        const hasLabel = id && document.querySelector('label[for="' + id + '"]');
+        const hasAriaLabel = input.hasAttribute('aria-label') || input.hasAttribute('aria-labelledby');
+        
+        if (!hasLabel && !hasAriaLabel) {
+          issues.push({
+            id: 'missing-input-label-' + i,
+            type: 'critical',
+            element: 'input',
+            message: 'Form input has no associated label.',
+            suggestion: 'Use a <label for="' + (id || 'id') + '"> element or add an aria-label to identify the field.',
+            selector: id ? '#' + id : 'input:nth-child(' + (i+1) + ')'
+          });
         }
       });
 
-      // 4. Heading Hierarchy
-      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-      if (headings.length > 0 && headings[0].tagName !== 'H1') {
-        issues.push({ type: 'warning', msg: 'Heading hierarchy should start with H1.', target: 'Headings' });
-      }
-
-      // Ensure language is set
-      if (!document.documentElement.getAttribute('lang')) {
-        document.documentElement.setAttribute('lang', 'en');
-      }
-
-      // Report to host
       window.parent.postMessage({ type: 'accessibility-audit', issues }, '*');
     }
 
     window.addEventListener('load', auditAccessibility);
     const observer = new MutationObserver(() => auditAccessibility());
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
   })();
 </script>
 `;

@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { THEME_VARIABLES } from './injection';
+import { ThemeState } from '../types';
 
 /**
- * PRODUCTION-GRADE HTML TO REACT ARCHITECT
+ * PRODUCTION-GRADE HTML TO REACT ARCHITECT v3.1
  * ---------------------------------------------------------
  * Performs deep semantic analysis of flat artifact HTML and transfigures it 
  * into a modular, state-aware React application.
@@ -28,7 +29,11 @@ const ATTRIBUTE_MAP: Record<string, string> = {
   'stroke-width': 'strokeWidth',
   'stroke-linecap': 'strokeLinecap',
   'stroke-linejoin': 'strokeLinejoin',
+  'stroke-opacity': 'strokeOpacity',
+  'stroke-dasharray': 'strokeDasharray',
+  'stroke-dashoffset': 'strokeDashoffset',
   'fill-rule': 'fillRule',
+  'fill-opacity': 'fillOpacity',
   'clip-rule': 'clipRule',
   'stop-color': 'stopColor',
   'stop-opacity': 'stopOpacity',
@@ -37,18 +42,21 @@ const ATTRIBUTE_MAP: Record<string, string> = {
   'text-anchor': 'textAnchor',
   'gradientunits': 'gradientUnits',
   'preserveaspectratio': 'preserveAspectRatio',
+  'xlink:href': 'xlinkHref',
 };
 
-/**
- * Normalizes CSS property keys to camelCase for React's style object.
- */
+function toPascalCase(str: string) {
+  return str
+    .replace(/[^a-zA-Z0-9]/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('');
+}
+
 function toCamelCase(str: string) {
   return str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
-/**
- * Transmutes a standard CSS style string into a JSON object literal.
- */
 function parseStyle(styleString: string): string {
   if (!styleString) return '{}';
   const styleObj: Record<string, string> = {};
@@ -64,36 +72,11 @@ function parseStyle(styleString: string): string {
   return JSON.stringify(styleObj);
 }
 
-/**
- * INFERRED STATE MODEL
- */
 interface StateInfo {
+  id: string;
   name: string;
   initialValue: string;
-  type: 'string' | 'boolean';
-}
-
-/**
- * Discovers interactive elements and creates logical state bindings.
- */
-function extractStateFromNode(el: HTMLElement): StateInfo[] {
-  const states: StateInfo[] = [];
-  const id = el.id || (el as any).name || `el_${Math.random().toString(36).substring(2, 7)}`;
-  const camelId = toCamelCase(id);
-
-  if (el.tagName === 'INPUT') {
-    const input = el as HTMLInputElement;
-    if (input.type === 'checkbox' || input.type === 'radio') {
-      states.push({ name: camelId, initialValue: 'false', type: 'boolean' });
-    } else {
-      states.push({ name: camelId, initialValue: `"${input.value || ''}"`, type: 'string' });
-    }
-  } else if (el.tagName === 'TEXTAREA') {
-    states.push({ name: camelId, initialValue: `"${el.textContent?.trim() || ''}"`, type: 'string' });
-  } else if (el.tagName === 'SELECT') {
-    states.push({ name: camelId, initialValue: '"' + (el as HTMLSelectElement).value + '"', type: 'string' });
-  }
-  return states;
+  type: 'string' | 'boolean' | 'number';
 }
 
 /**
@@ -121,12 +104,17 @@ function elementToJSX(node: Node, stateMap: Map<HTMLElement, StateInfo>, depth: 
     const attr = el.attributes[i];
     const name = ATTRIBUTE_MAP[attr.name.toLowerCase()] || attr.name;
     
+    if (state && (name === 'value' || name === 'checked')) continue;
+
     if (name === 'style') {
       attributes.push(`${name}={${parseStyle(attr.value)}}`);
     } else if (name === 'className') {
       attributes.push(`${name}="${attr.value}"`);
+    } else if (name === 'onClick') {
+      // If it's a button and we want to show it's interactive, we could add a log
+      attributes.push(`${name}={() => console.log("${tagName} clicked")}`);
     } else if (name.startsWith('on')) {
-      attributes.push(`${name}={() => console.log("${name} fired")}`);
+      attributes.push(`${name}={(e) => console.log("${name} event", e)}`);
     } else {
       if (['disabled', 'checked', 'required', 'readOnly', 'hidden'].includes(name) && (attr.value === '' || attr.value === 'true')) {
         attributes.push(`${name}={true}`);
@@ -136,14 +124,13 @@ function elementToJSX(node: Node, stateMap: Map<HTMLElement, StateInfo>, depth: 
     }
   }
 
-  // Inject dynamic state binding
   if (state) {
     if (state.type === 'boolean') {
-      attributes.push(`checked={${state.name}}`);
-      attributes.push(`onChange={(e) => set${state.name.charAt(0).toUpperCase() + state.name.slice(1)}(e.target.checked)}`);
+      attributes.push(`checked={formData.${state.name}}`);
+      attributes.push(`onChange={(e) => handleInputChange('${state.name}', e.target.checked)}`);
     } else {
-      attributes.push(`value={${state.name}}`);
-      attributes.push(`onChange={(e) => set${state.name.charAt(0).toUpperCase() + state.name.slice(1)}(e.target.value)}`);
+      attributes.push(`value={formData.${state.name}}`);
+      attributes.push(`onChange={(e) => handleInputChange('${state.name}', e.target.value)}`);
     }
   }
 
@@ -160,10 +147,10 @@ function elementToJSX(node: Node, stateMap: Map<HTMLElement, StateInfo>, depth: 
 /**
  * The primary entry point for HTML-to-React transmutation.
  */
-export function convertToReactComponent(html: string, originalName: string = 'ManifestedApp', customCss: string = ''): string {
+export function convertToReactComponent(html: string, originalName: string = 'ManifestedApp', customCss: string = '', theme?: ThemeState): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  const safeName = originalName.replace(/[^a-zA-Z0-9]/g, '') || 'ManifestedApp';
+  const safeName = toPascalCase(originalName) || 'ManifestedApp';
   
   const styles = (customCss || Array.from(doc.querySelectorAll('style'))
     .map(s => s.textContent)
@@ -173,51 +160,66 @@ export function convertToReactComponent(html: string, originalName: string = 'Ma
     .map(s => s.textContent)
     .join('\n');
 
+  // Inject current theme HSL values into THEME_VARIABLES string
+  let themedVariables = THEME_VARIABLES;
+  if (theme) {
+    themedVariables = themedVariables
+      .replace(/--m-accent-h:\s*\d+;/, `--m-accent-h: ${theme.h};`)
+      .replace(/--m-accent-s:\s*\d+%;/, `--m-accent-s: ${theme.s}%;`)
+      .replace(/--m-accent-l:\s*\d+%;/, `--m-accent-l: ${theme.l}%;`);
+  }
+
   const body = doc.body;
   const stateMap = new Map<HTMLElement, StateInfo>();
   const globalStates: StateInfo[] = [];
 
-  // Deep traversal for state discovery
-  const allInteractive = body.querySelectorAll('input, textarea, select');
-  allInteractive.forEach(el => {
-    const s = extractStateFromNode(el as HTMLElement);
-    if (s.length > 0) {
-      stateMap.set(el as HTMLElement, s[0]);
-      globalStates.push(s[0]);
+  const allInputs = body.querySelectorAll('input, textarea, select');
+  allInputs.forEach((el, idx) => {
+    const input = el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+    const nameAttr = input.getAttribute('name') || input.id || `field_${idx}`;
+    const stateName = toCamelCase(nameAttr);
+    
+    let type: 'string' | 'boolean' | 'number' = 'string';
+    let initialValue = `"${input.value || ''}"`;
+
+    if (input instanceof HTMLInputElement) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        type = 'boolean';
+        initialValue = input.checked ? 'true' : 'false';
+      } else if (input.type === 'number' || input.type === 'range') {
+        type = 'number';
+        initialValue = input.value || '0';
+      }
     }
+
+    const s: StateInfo = { id: input.id, name: stateName, initialValue, type };
+    stateMap.set(el as HTMLElement, s);
+    globalStates.push(s);
   });
 
-  const subComponents: { name: string, jsx: string, stateful: boolean }[] = [];
+  const subComponents: { name: string, jsx: string }[] = [];
   const rootElements = Array.from(body.children).filter(el => el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE');
-  const mainJSXParts: string[] = [];
-
+  
   rootElements.forEach((el, index) => {
     const htmlEl = el as HTMLElement;
-    const baseName = htmlEl.tagName.toLowerCase();
-    const id = htmlEl.id || `Block${index + 1}`;
-    const componentName = `${baseName.charAt(0).toUpperCase() + baseName.slice(1)}${toCamelCase(id).charAt(0).toUpperCase() + toCamelCase(id).slice(1)}`;
+    const tagName = htmlEl.tagName.toLowerCase();
+    let componentName = toPascalCase(htmlEl.id || htmlEl.getAttribute('aria-label') || `${tagName}_${index + 1}`);
     
-    const hasInteractive = htmlEl.querySelectorAll('button, input, select, textarea').length > 0;
+    if (subComponents.find(c => c.name === componentName)) {
+        componentName += `_${index}`;
+    }
+
     const jsx = elementToJSX(htmlEl, stateMap);
-    
-    subComponents.push({ name: componentName, jsx, stateful: hasInteractive });
-    mainJSXParts.push(`<${componentName} />`);
+    subComponents.push({ name: componentName, jsx });
   });
 
-  if (mainJSXParts.length === 0 && body.innerHTML.trim() !== '') {
-    mainJSXParts.push(elementToJSX(body, stateMap));
-  }
-
-  const stateHooks = globalStates.map(s => 
-    `  const [${s.name}, set${s.name.charAt(0).toUpperCase() + s.name.slice(1)}] = useState(${s.initialValue});`
-  ).join('\n');
+  const initialFormData = globalStates.map(s => `    ${s.name}: ${s.initialValue},`).join('\n');
 
   const subComponentCode = subComponents.map(comp => `
 /**
  * ${comp.name} Component
- * Structural fragment inferred from artifact hierarchy.
  */
-const ${comp.name} = () => {
+const ${comp.name} = ({ formData, handleInputChange }: { formData: any, handleInputChange: (name: string, value: any) => void }) => {
   return (
     ${comp.jsx}
   );
@@ -225,18 +227,18 @@ const ${comp.name} = () => {
 `).join('\n');
 
   return `
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 
 /**
  * ${safeName} Component
  * ---------------------------------------------------------
- * Transmuted by Manifest Engine v2.5
- * Refined HTML-to-React conversion with automated state induction,
- * lifecycle preservation, and Tailwind CSS compatibility.
+ * Transmuted by Manifest Engine v3.1 (Production)
+ * Advanced HTML-to-React conversion with consolidated state 
+ * management and semantic component decomposition.
  */
 
 const GLOBAL_STYLES = \`
-${THEME_VARIABLES}
+${themedVariables}
 ${styles}
 \`;
 
@@ -245,31 +247,40 @@ ${subComponentCode}
 export default function ${safeName}() {
   const [isMounted, setIsMounted] = useState(false);
   
-  /* Induced State Management */
-${stateHooks}
+  /* Consolidated Form State */
+  const [formData, setFormData] = useState({
+${initialFormData}
+  });
+
+  const handleInputChange = useCallback((name: string, value: any) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
     
-    /* Extracted Legacy Logic */
+    /* Injected Legacy Logic */
     try {
-      ${scripts ? scripts.split('\n').map(line => '      ' + line).join('\n') : '// No legacy script logic detected.'}
+      ${scripts ? scripts.split('\n').map(line => '      ' + line).join('\n') : '// No legacy logic segments detected.'}
     } catch (error) {
-      console.error("[${safeName}] Lifecycle Fault:", error);
+      console.error("[${safeName}] Initialization Fault:", error);
     }
   }, []);
 
   return (
-    <div className="manifest-app-wrapper min-h-screen bg-zinc-50">
+    <div className="manifest-app-root min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <style dangerouslySetInnerHTML={{ __html: GLOBAL_STYLES }} />
       
-      <main className="manifest-viewport antialiased text-manifest-main bg-manifest-primary">
-        ${mainJSXParts.join('\n        ')}
+      <main className="manifest-viewport manifest-prose antialiased text-manifest-main bg-manifest-primary">
+        ${subComponents.map(c => `<${c.name} formData={formData} handleInputChange={handleInputChange} />`).join('\n        ')}
       </main>
 
       {!isMounted && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-[9999]">
-          <div className="w-12 h-12 border-4 border-manifest-accent border-t-transparent rounded-full animate-spin"></div>
+        <div className="fixed inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-[3px] border-manifest-accent border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 animate-pulse">Initializing Surface</span>
+          </div>
         </div>
       )}
     </div>

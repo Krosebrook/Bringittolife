@@ -31,10 +31,13 @@ Manifestation Lab is a production-grade neural synthesis environment that transf
 
 ## 📚 Documentation
 
-- **[AUDIT.md](./AUDIT.md)**: Comprehensive codebase audit and recommendations
-- **[REPOSITORIES.md](./REPOSITORIES.md)**: 6 recommended repositories for reference and integration
-- **[GITHUB_AGENT_PROMPTS.md](./GITHUB_AGENT_PROMPTS.md)**: 5 context-engineered prompts for GitHub agents
-- **[COPILOT_PROMPT.md](./COPILOT_PROMPT.md)**: GitHub Copilot context prompt
+**→ [START HERE: SUMMARY.md](./SUMMARY.md)** - Quick start guide and overview
+
+Core Documentation:
+- **[AUDIT.md](./AUDIT.md)**: Comprehensive codebase audit and recommendations (15,700 words)
+- **[REPOSITORIES.md](./REPOSITORIES.md)**: 6 recommended repositories for reference and integration (14,600 words)
+- **[GITHUB_AGENT_PROMPTS.md](./GITHUB_AGENT_PROMPTS.md)**: 5 context-engineered prompts for GitHub agents (26,300 words)
+- **[COPILOT_PROMPT.md](./COPILOT_PROMPT.md)**: GitHub Copilot context prompt (16,300 words)
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)**: Technical architecture overview
 - **[PRD.md](./PRD.md)**: Product requirements document
 

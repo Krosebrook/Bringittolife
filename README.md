@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Manifestation Lab v3.0
 
-# Run and deploy your AI Studio app
+Manifestation Lab is a production-grade neural synthesis environment that transfigures raw visual fragments—doodles, blueprints, or screenshots—into high-fidelity interactive digital artifacts.
 
-This contains everything you need to run your app locally.
+## 🚀 Quick Start
 
-View your app in AI Studio: https://ai.studio/apps/drive/1WKzkM7qMgkVH_BJekY5wrC8w_yCa65Xr
+1. Ensure your environment variable `API_KEY` is configured with a valid Google Gemini API key.
+2. Open `index.html` in a modern web browser.
+3. Drop an image or enter a prompt to begin the manifestation cycle.
 
-## Run Locally
+## ✨ Core Features
 
-**Prerequisites:**  Node.js
+- **Multi-Modal Synthesis**: Bridge the gap between static imagery (PNG, JPG, PDF) and functional code using Gemini 3 Pro.
+- **Live Refinement Agent**: Mutate your artifacts in real-time via text or voice commands.
+- **Design Personas**: Switch between Modernist, Brutalist, Accessible, Playful, and Enterprise design systems instantly.
+- **Developer Suite**:
+    - **CSS Lab**: Real-time CSS editor with an integrated linter and auto-fix capabilities.
+    - **Accessibility Audit**: WCAG compliance engine with one-click "Heal All" functionality.
+    - **Technical Manifesto**: AI-generated documentation including purpose, I/O schemas, and runtime logic.
+    - **Pipeline Visualization**: Simulated CI/CD steps for production readiness.
+- **Pro-Grade Exports**: Export artifacts as modular React components, standalone HTML files, or high-fidelity PDFs.
+- **PWA Ready**: Offline-first architecture with service worker caching.
 
+## 🛠️ Technical Stack
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **Framework**: React 19.2
+- **Styling**: Tailwind CSS (Dynamic Play CDN)
+- **AI Engine**: Google Gemini API (@google/genai)
+- **Icons**: Heroicons v2.2
+- **Visuals**: PDF.js, CSS Dot Grid, Noise Textures
+
+## 🛡️ License
+
+SPDX-License-Identifier: Apache-2.0

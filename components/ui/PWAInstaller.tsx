@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,11 +10,25 @@ export const PWAInstaller: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
 
+  // 1. Service Worker Registration
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+          console.debug('[Manifest SW] Registered:', registration.scope);
+        }).catch(error => {
+          console.error('[Manifest SW] Registration failed:', error);
+        });
+      });
+    }
+  }, []);
+
+  // 2. Install Prompt Handling
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // Check if already in standalone mode
+      
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
                          || (window.navigator as any).standalone 
                          || document.referrer.includes('android-app://');

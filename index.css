@@ -1,5 +1,8 @@
 
-/* Manifest Design System - Global Variables */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --m-accent-h: 217;
   --m-accent-s: 91%;
@@ -8,23 +11,74 @@
   --manifest-accent-glow: hsla(var(--m-accent-h), var(--m-accent-s), var(--m-accent-l), 0.3);
 }
 
-/* Technical Dot Grid Background */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #050507;
+  color: #fafafa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Technical Dot Grid with Depth */
 .bg-dot-grid {
-  background-size: 40px 40px;
-  background-image: radial-gradient(circle, #3f3f46 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-image: radial-gradient(circle at 2px 2px, #18181b 1px, transparent 0);
 }
 
-/* Custom Scrollbar Hiding */
+/* Premium Noise Texture Layer */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+/* Glassmorphism Presets */
+.glass {
+  background: rgba(18, 18, 22, 0.7);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
 .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-}
-.scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  display: none;
 }
 
-/* Theme-Aware Selection */
+/* Animations */
+@keyframes spatial-pulse {
+  0% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.05); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 0.3; }
+}
+
+.animate-spatial {
+  animation: spatial-pulse 4s ease-in-out infinite;
+}
+
 ::selection {
-  background-color: var(--manifest-accent-glow);
+  background-color: var(--manifest-accent);
   color: white;
 }

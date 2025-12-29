@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
-import { CodeBracketIcon, SwatchIcon, PhotoIcon, ChatBubbleLeftRightIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { SwatchIcon, PhotoIcon, ChatBubbleLeftRightIcon, ActivityLogIcon } from '@heroicons/react/24/outline';
 import { Creation, DeviceMode } from '../types';
 import { WindowControls } from './live/toolbar/WindowControls';
 import { ViewportControls } from './live/toolbar/ViewportControls';
@@ -68,57 +68,60 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
 }) => {
     return (
         <nav 
-          aria-label="Editor navigation"
-          className="bg-[#121214] px-4 py-3 flex items-center justify-between border-b border-zinc-800 shrink-0 z-50 relative h-16 shadow-lg"
+          aria-label="Editor command bar"
+          className="bg-[#0c0c0e] px-5 py-3 flex items-center justify-between border-b border-zinc-800 shrink-0 z-50 relative h-20 shadow-2xl"
         >
             <WindowControls onClose={onReset} projectName={creation?.name} />
             
-            <div className="hidden lg:flex items-center space-x-2 bg-zinc-950/40 px-3 py-1.5 rounded-full border border-zinc-900/50">
-                <div className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse" />
-                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                    {isLoading ? 'Processing...' : 'Live Manifestation'}
+            <div className="hidden xl:flex items-center space-x-3 px-4 py-2 bg-zinc-950/60 rounded-full border border-zinc-800/40">
+                <div className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLoading ? 'bg-amber-400' : 'bg-green-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isLoading ? 'bg-amber-500' : 'bg-green-500'}`}></span>
+                </div>
+                <span className="text-[10px] font-black font-mono text-zinc-500 uppercase tracking-[0.2em]">
+                    {isLoading ? 'Synthesizing...' : 'Sync Active'}
                 </span>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
                 {!isLoading && creation && (
                     <>
-                        <div className="flex items-center bg-zinc-900/50 rounded-lg p-0.5 border border-zinc-800/50" role="group" aria-label="Editor panels">
-                            <Tooltip content="Refinement Lab (AI Chat)" side="bottom">
+                        <div className="flex items-center bg-zinc-900/40 rounded-xl p-1 border border-zinc-800/60" role="group" aria-label="Tool panels">
+                            <Tooltip content="Refinement (AI)" side="bottom">
                                 <button 
                                     onClick={() => onToggleSidePanel?.('chat')}
-                                    aria-label="Toggle Chat Panel"
+                                    aria-label="Toggle AI Chat"
                                     aria-pressed={showSplitView && activeSidePanel === 'chat'}
-                                    className={`p-2 rounded-md transition-all ${showSplitView && activeSidePanel === 'chat' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+                                    className={`p-2.5 rounded-lg transition-all ${showSplitView && activeSidePanel === 'chat' ? 'bg-zinc-700 text-white shadow-inner' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40'}`}
                                 >
-                                    <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                                    <ChatBubbleLeftRightIcon className="w-4.5 h-4.5" />
                                 </button>
                             </Tooltip>
                             {creation.originalImage && (
-                                <Tooltip content="Reference Blueprint" side="bottom">
+                                <Tooltip content="Reference" side="bottom">
                                     <button 
                                         onClick={() => onToggleSidePanel?.('reference')}
                                         aria-label="Toggle Reference View"
                                         aria-pressed={showSplitView && activeSidePanel === 'reference'}
-                                        className={`p-2 rounded-md transition-all ${showSplitView && activeSidePanel === 'reference' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+                                        className={`p-2.5 rounded-lg transition-all ${showSplitView && activeSidePanel === 'reference' ? 'bg-zinc-700 text-white shadow-inner' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40'}`}
                                     >
-                                        <PhotoIcon className="w-4 h-4" />
+                                        <PhotoIcon className="w-4.5 h-4.5" />
                                     </button>
                                 </Tooltip>
                             )}
-                            <Tooltip content="Style Lab (CSS)" side="bottom">
+                            <Tooltip content="Styling (CSS)" side="bottom">
                                 <button 
                                     onClick={() => onToggleSidePanel?.('css')}
                                     aria-label="Toggle CSS Editor"
                                     aria-pressed={showSplitView && activeSidePanel === 'css'}
-                                    className={`p-2 rounded-md transition-all ${showSplitView && activeSidePanel === 'css' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+                                    className={`p-2.5 rounded-lg transition-all ${showSplitView && activeSidePanel === 'css' ? 'bg-zinc-700 text-white shadow-inner' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/40'}`}
                                 >
-                                    <SwatchIcon className="w-4 h-4" />
+                                    <SwatchIcon className="w-4.5 h-4.5" />
                                 </button>
                             </Tooltip>
                         </div>
 
-                        <div className="w-px h-4 bg-zinc-800 mx-1" />
+                        <div className="h-6 w-px bg-zinc-800 mx-1" aria-hidden="true" />
 
                         <ViewportControls 
                             scale={scale}

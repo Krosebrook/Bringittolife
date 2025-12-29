@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -59,55 +60,49 @@ export const InputArea: React.FC<InputAreaProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 px-4">
-      {/* ERROR DISPLAY */}
+    <div className="w-full max-w-3xl mx-auto flex flex-col gap-10 px-4 mt-8">
       {error && (
-        <div className="bg-red-950/30 border border-red-500/50 rounded-lg p-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-          <ExclamationCircleIcon className="w-5 h-5 text-red-500 shrink-0" />
-          <p className="text-red-200 text-sm font-medium">{error}</p>
+        <div className="bg-red-500/10 border border-red-500/20 backdrop-blur-md rounded-2xl p-4 flex items-center gap-4 animate-in zoom-in-95 duration-300">
+          <ExclamationCircleIcon className="w-6 h-6 text-red-500 shrink-0" />
+          <p className="text-red-200 text-sm font-medium tracking-tight">{error}</p>
         </div>
       )}
 
-      {/* DROP ZONE */}
-      <div className={`relative group transition-all duration-300 ${isDragging ? 'scale-[1.01]' : ''}`}>
+      <div className={`relative group transition-all duration-500 ease-out ${isDragging ? 'scale-[1.02]' : ''}`}>
+        <div className={`absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000 ${isDragging ? 'opacity-60' : ''}`}></div>
+        
         <label
           className={`
             relative flex flex-col items-center justify-center
-            h-64 sm:h-72 md:h-80
-            bg-zinc-900/30 backdrop-blur-sm
-            rounded-2xl border-2 border-dashed
+            h-64 sm:h-80
+            glass rounded-3xl border border-white/10
             cursor-pointer overflow-hidden
-            transition-all duration-300
-            ${isDragging 
-              ? 'border-blue-500 bg-zinc-900/50 shadow-[0_0_40px_rgba(59,130,246,0.1)]' 
-              : 'border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900/40'
-            }
-            ${isGenerating ? 'pointer-events-none opacity-80' : ''}
+            transition-all duration-500
+            ${isDragging ? 'border-blue-500/50 shadow-[0_0_50px_rgba(59,130,246,0.15)] bg-zinc-900/40' : 'hover:bg-zinc-900/20 hover:border-white/20'}
+            ${isGenerating ? 'pointer-events-none opacity-40' : ''}
           `}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
         >
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-                 style={{backgroundImage: 'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)', backgroundSize: '32px 32px'}}>
-            </div>
+            <div className="absolute inset-0 bg-dot-grid opacity-10 pointer-events-none"></div>
             
-            <div className="relative z-10 flex flex-col items-center text-center space-y-6 px-8">
-                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-zinc-800 border border-zinc-700 shadow-xl flex items-center justify-center transition-transform duration-500 ${isDragging ? 'scale-110' : ''}`}>
+            <div className="relative z-10 flex flex-col items-center text-center space-y-6 px-10">
+                <div className={`w-20 h-20 rounded-2xl bg-zinc-950 border border-white/5 flex items-center justify-center transition-all duration-700 ${isDragging ? 'scale-110 shadow-blue-500/20' : ''}`}>
                     {isGenerating ? (
                         <CpuChipIcon className="w-10 h-10 text-blue-400 animate-spin-slow" />
                     ) : (
-                        <ArrowUpTrayIcon className={`w-10 h-10 text-zinc-300 transition-all ${isDragging ? 'text-blue-400 -translate-y-1' : ''}`} />
+                        <ArrowUpTrayIcon className={`w-10 h-10 text-zinc-400 transition-all ${isDragging ? 'text-blue-400 -translate-y-1' : ''}`} />
                     )}
                 </div>
 
-                <div className="space-y-2">
-                    <h3 className="text-2xl sm:text-3xl md:text-4xl text-zinc-100 font-bold tracking-tighter flex flex-col md:flex-row items-center gap-2">
+                <div className="space-y-1">
+                    <h3 className="text-3xl md:text-4xl text-white font-black tracking-tight flex flex-col md:flex-row items-center gap-3">
                         <span>Manifest</span>
                         <CyclingText />
                     </h3>
-                    <p className="text-zinc-500 font-light text-sm md:text-lg">
-                        Drop any visual artifact to bring it to life
+                    <p className="text-zinc-500 font-medium text-sm md:text-base tracking-tight">
+                        Drop any visual blueprint to transfigure reality
                     </p>
                 </div>
             </div>
@@ -118,49 +113,51 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 className="hidden"
                 onChange={handleFileChange}
                 disabled={isGenerating || disabled}
-                aria-label="Upload artifact image or PDF"
+                aria-label="Upload artifact"
             />
         </label>
       </div>
 
-      <div className="relative flex items-center py-2 opacity-30">
-        <div className="flex-grow border-t border-zinc-800"></div>
-        <span className="mx-4 text-xs font-mono uppercase tracking-widest">or prompt manifestation</span>
-        <div className="flex-grow border-t border-zinc-800"></div>
-      </div>
-
-      {/* TEXT INPUT */}
-      <form onSubmit={handleTextSubmit} className="relative w-full group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/10 to-blue-500/10 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition duration-500"></div>
-        
-        <div className="relative flex items-center bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 rounded-xl p-2 focus-within:border-blue-500/50 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-2xl">
-            <PaintBrushIcon className="w-5 h-5 text-zinc-500 ml-3 shrink-0" />
-            <input 
-                type="text" 
-                value={textPrompt}
-                onChange={(e) => setTextPrompt(e.target.value)}
-                placeholder="Describe an interface or add context for your file..."
-                className="w-full bg-transparent border-none text-zinc-200 placeholder-zinc-600 focus:ring-0 text-base px-4 py-2"
-                disabled={isGenerating || disabled}
-                aria-label="Manifestation prompt"
-            />
-            
-            <button 
-                type="submit"
-                disabled={!textPrompt.trim() || isGenerating || disabled}
-                className="bg-white hover:bg-zinc-200 text-black disabled:bg-zinc-800 disabled:text-zinc-600 px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 shrink-0 active:scale-95"
-            >
-                {isGenerating ? (
-                    <div className="w-4 h-4 border-2 border-zinc-400 border-t-black rounded-full animate-spin"></div>
-                ) : (
-                    <>
-                        <span>Manifest</span>
-                        <SparklesIcon className="w-4 h-4 text-blue-600" />
-                    </>
-                )}
-            </button>
+      <div className="flex flex-col gap-6">
+        <div className="relative flex items-center py-2">
+          <div className="flex-grow border-t border-white/5"></div>
+          <span className="mx-6 text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-600">Contextual Prompt</span>
+          <div className="flex-grow border-t border-white/5"></div>
         </div>
-      </form>
+
+        <form onSubmit={handleTextSubmit} className="relative w-full group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition duration-700"></div>
+          
+          <div className="relative flex items-center bg-zinc-950/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-2.5 focus-within:border-blue-500/40 focus-within:ring-4 focus-within:ring-blue-500/5 transition-all shadow-2xl">
+              <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-zinc-900 border border-white/5 ml-1">
+                  <PaintBrushIcon className="w-5 h-5 text-zinc-500" />
+              </div>
+              <input 
+                  type="text" 
+                  value={textPrompt}
+                  onChange={(e) => setTextPrompt(e.target.value)}
+                  placeholder="Describe an interface or set context..."
+                  className="w-full bg-transparent border-none text-white placeholder-zinc-700 focus:ring-0 text-base px-5 py-3 font-medium"
+                  disabled={isGenerating || disabled}
+              />
+              
+              <button 
+                  type="submit"
+                  disabled={!textPrompt.trim() || isGenerating || disabled}
+                  className="bg-white hover:bg-zinc-100 text-black disabled:bg-zinc-900 disabled:text-zinc-700 px-6 py-3 rounded-xl text-sm font-black transition-all flex items-center gap-3 shrink-0 active:scale-95 shadow-xl shadow-white/5"
+              >
+                  {isGenerating ? (
+                      <div className="w-4 h-4 border-2 border-zinc-500 border-t-black rounded-full animate-spin"></div>
+                  ) : (
+                      <>
+                          <span>Manifest</span>
+                          <SparklesIcon className="w-4 h-4 text-blue-600" />
+                      </>
+                  )}
+              </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

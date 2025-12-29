@@ -14,22 +14,23 @@ const PERSONA_INSTRUCTIONS: Record<DesignPersona, string> = {
   enterprise: "High information density, professional blue/slate palettes, complex data tables, and standard SaaS patterns."
 };
 
-const BASE_SYSTEM_INSTRUCTION = `You are a world-class AI Software Architect and Lead Designer at the Manifestation Lab.
-Your mission is to transfigure user intent into high-fidelity, interactive digital artifacts.
+const BASE_SYSTEM_INSTRUCTION = `You are a world-class AI Software Architect and Lead Designer at the Manifestation Lab. 
+Your mission is to transfigure user intent into production-grade, high-fidelity interactive digital artifacts.
 
 CORE ARCHITECTURAL PRINCIPLES:
-1. ARCHITECTURE: Output ONLY a complete, self-contained HTML5 file.
-2. STYLING: Exclusively use Tailwind CSS. Harness the 'manifest' custom theme variables (e.g., bg-manifest-primary).
-3. RUNTIME: Use modern ES6+ Vanilla JavaScript for interactivity.
-4. GROUNDING: When the 'googleSearch' tool is invoked, use ACTUAL data (real news, stock prices) to populate the UI.
-5. CONTINUITY: For iterations, always return the FULL, functional HTML document.
-6. ACCESSIBILITY: Every interactive element MUST have a clear ARIA label. Use semantic tags (<main>, <nav>, <section>, <header>, <footer>). Ensure focus states are visible and contrast ratios meet WCAG 2.1 AA standards.
+1. OUTPUT: Return ONLY a complete, self-contained HTML5 file. 
+2. STYLING: Exclusively use Tailwind CSS. Harness the 'manifest' custom theme variables for consistency.
+3. SEMANTICS: Use high-quality semantic HTML (<header>, <nav>, <main>, <section>, <article>, <footer>). 
+4. NAVIGATION: Every app MUST include a clean navigation system (e.g., a header with links/logo) and a clear way to navigate between logical sections.
+5. ACCESSIBILITY: Every interactive element MUST have an aria-label. Use appropriate roles. Contrast must be WCAG 2.1 AA compliant.
+6. INTERACTIVITY: Implement robust ES6+ JavaScript. Handle state changes smoothly.
+7. GROUNDING: When using 'googleSearch', populate the UI with actual, real-world data from the search results. Do not use placeholders.
 
 AESTHETIC GUARDRAILS:
-- Always include an elegant, subtle background.
-- Use 'Inter' as the primary typeface.
-- Ensure buttons have distinct :hover and :active states.
-- Group related items in 'card' classes.
+- Use sophisticated typography (Inter).
+- Implement glassmorphism effects where appropriate.
+- Ensure focus states are beautifully styled (glow/ring).
+- Buttons must have :hover, :active, and :disabled states.
 
 FORMATTING: Output only raw code. No markdown code blocks. Start directly with <!DOCTYPE html>.`;
 
@@ -58,6 +59,7 @@ class GeminiService {
         systemInstruction: this.getInstruction(persona),
         tools: [{ googleSearch: {} }],
         temperature: 0.1,
+        thinkingConfig: { thinkingBudget: 4000 } // Reserve budget for high-quality code reasoning
       },
     });
 
@@ -74,6 +76,7 @@ class GeminiService {
       config: {
         systemInstruction: this.getInstruction(persona),
         tools: [{ googleSearch: {} }],
+        thinkingConfig: { thinkingBudget: 4000 }
       },
       history: history.map(h => ({
         role: h.role === 'user' ? 'user' : 'model',
@@ -92,7 +95,7 @@ class GeminiService {
     const ai = this.getClient();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `High-fidelity UI mockup for: ${prompt}` }] }
+      contents: { parts: [{ text: `High-fidelity, award-winning UI/UX mockup for: ${prompt}. Cinematic lighting, 4K detail, professional color grading.` }] }
     });
     
     const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);

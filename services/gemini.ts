@@ -6,6 +6,17 @@
 import { GoogleGenAI, Part } from "@google/genai";
 import { GeneratedImageResult, ChatMessage, DesignPersona } from "../types";
 
+// Model Configuration Constants
+const GEMINI_MODELS = {
+  CODE_GENERATION: 'gemini-3-pro-preview',
+  IMAGE_GENERATION: 'gemini-2.5-flash-image',
+} as const;
+
+const MODEL_CONFIG = {
+  TEMPERATURE: 0.1, // High precision for code generation
+  THINKING_BUDGET: 4000, // Token budget for deep reasoning
+} as const;
+
 const PERSONA_INSTRUCTIONS: Record<DesignPersona, string> = {
   modernist: "Focus on clean typography (Inter), ample whitespace, and subtle gradients. High precision grids with minimal borders.",
   brutalist: "Bold, oversized typography, ultra-high contrast, raw layouts, and intentional overlapping elements.",
@@ -32,17 +43,78 @@ AESTHETIC GUARDRAILS:
 
 FORMATTING: Output only raw code. No markdown code blocks. Start directly with <!DOCTYPE html>.`;
 
+/**
+ * GeminiService
+ * 
+ * Handles all interactions with Google Gemini AI models for code generation,
+ * artifact refinement, and image generation.
+ * 
+ * @example
+ * ```typescript
+ * const { html, grounding } = await geminiService.generateArtifact(
+ *   "Create a modern dashboard",
+ *   base64Image,
+ *   "image/png",
+ *   "modernist"
+ * );
+ * ```
+ */
 class GeminiService {
+  /**
+   * Creates and returns a configured Gemini AI client.
+   * 
+   * @private
+   * @returns {GoogleGenAI} Configured Gemini client
+   * @throws {Error} If API_KEY environment variable is not set
+   */
   private getClient(): GoogleGenAI {
     const apiKey = process.env.API_KEY;
     if (!apiKey) throw new Error("API_KEY execution context missing.");
     return new GoogleGenAI({ apiKey });
   }
 
+  /**
+   * Constructs the system instruction with the specified design persona.
+   * 
+   * @private
+   * @param {DesignPersona} persona - The design persona to apply (default: 'modernist')
+   * @returns {string} Complete system instruction with persona guidelines
+   */
   private getInstruction(persona: DesignPersona = 'modernist') {
     return `${BASE_SYSTEM_INSTRUCTION}\n\nACTIVE DESIGN PERSONA: ${PERSONA_INSTRUCTIONS[persona]}`;
   }
 
+  /**
+   * Generates a complete HTML artifact from a text prompt and optional image.
+   * 
+   * Uses Gemini 3 Pro Preview with:
+   * - High precision (temperature: 0.1)
+   * - Deep thinking (4000 token budget)
+   * - Google Search grounding for accuracy
+   * 
+   * @param {string} prompt - Text description of what to generate
+   * @param {string} [fileBase64] - Base64-encoded image data (optional)
+   * @param {string} [mimeType] - MIME type of the image (optional)
+   * @param {DesignPersona} [persona='modernist'] - Design system to apply
+   * @returns {Promise<{html: string, grounding?: any[]}>} Generated HTML and grounding sources
+   * @throws {Error} If API call fails or API key is missing
+   * 
+   * @example
+   * ```typescript
+   * // With image
+   * const result = await geminiService.generateArtifact(
+   *   "Create a landing page",
+   *   imageBase64,
+   *   "image/png",
+   *   "modernist"
+   * );
+   * 
+   * // Text only
+   * const result = await geminiService.generateArtifact(
+   *   "Create a login form"
+   * );
+   * ```
+   */
   async generateArtifact(prompt: string, fileBase64?: string, mimeType?: string, persona: DesignPersona = 'modernist'): Promise<{ html: string; grounding?: any[] }> {
     const ai = this.getClient();
     const parts: Part[] = [{ text: prompt }];
@@ -51,13 +123,13 @@ class GeminiService {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: GEMINI_MODELS.CODE_GENERATION,
       contents: { parts },
       config: {
         systemInstruction: this.getInstruction(persona),
         tools: [{ googleSearch: {} }],
-        temperature: 0.1,
-        thinkingConfig: { thinkingBudget: 4000 }
+        temperature: MODEL_CONFIG.TEMPERATURE,
+        thinkingConfig: { thinkingBudget: MODEL_CONFIG.THINKING_BUDGET }
       },
     });
 
@@ -67,6 +139,26 @@ class GeminiService {
     };
   }
 
+  /**
+   * Refines an existing artifact based on conversational history and a new instruction.
+   * 
+   * Maintains context from previous interactions to enable iterative refinement.
+   * Uses the same Gemini 3 Pro model with chat-based API for context continuity.
+   * 
+   * @param {ChatMessage[]} history - Previous conversation history
+   * @param {string} newPrompt - New refinement instruction
+   * @param {DesignPersona} [persona='modernist'] - Design system to maintain
+   * @returns {Promise<{html: string, grounding?: any[]}>} Refined HTML and grounding sources
+   * @throws {Error} If API call fails
+   * 
+   * @example
+   * ```typescript
+   * const refined = await geminiService.refineArtifact(
+   *   chatHistory,
+   *   "Make the header blue and add a search bar"
+   * );
+   * ```
+   */
   async refineArtifact(history: ChatMessage[], newPrompt: string, persona: DesignPersona = 'modernist'): Promise<{ html: string; grounding?: any[] }> {
     const ai = this.getClient();
     const chatHistory = history.map(h => ({
@@ -75,11 +167,11 @@ class GeminiService {
     }));
 
     const chat = ai.chats.create({
-      model: 'gemini-3-pro-preview',
+      model: GEMINI_MODELS.CODE_GENERATION,
       config: {
         systemInstruction: this.getInstruction(persona),
         tools: [{ googleSearch: {} }],
-        thinkingConfig: { thinkingBudget: 4000 }
+        thinkingConfig: { thinkingBudget: MODEL_CONFIG.THINKING_BUDGET }
       },
       history: chatHistory
     });
@@ -91,10 +183,28 @@ class GeminiService {
     };
   }
 
+  /**
+   * Generates a high-quality UI mockup image from a text prompt.
+   * 
+   * Uses Gemini 2.5 Flash Image model optimized for fast, high-quality image generation.
+   * Automatically enhances the prompt with professional photography and design terms.
+   * 
+   * @param {string} prompt - Description of the UI to generate
+   * @returns {Promise<GeneratedImageResult>} Base64-encoded image with MIME type
+   * @throws {Error} If image generation fails or response is invalid
+   * 
+   * @example
+   * ```typescript
+   * const { base64, mimeType } = await geminiService.generateStarterImage(
+   *   "E-commerce checkout page"
+   * );
+   * const imageUrl = `data:${mimeType};base64,${base64}`;
+   * ```
+   */
   async generateStarterImage(prompt: string): Promise<GeneratedImageResult> {
     const ai = this.getClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: GEMINI_MODELS.IMAGE_GENERATION,
       contents: { parts: [{ text: `High-fidelity, award-winning UI/UX mockup for: ${prompt}. Cinematic lighting, 4K detail, professional color grading.` }] }
     });
     
@@ -111,6 +221,29 @@ class GeminiService {
     };
   }
 
+  /**
+   * Extracts clean HTML from AI response, handling various formats.
+   * 
+   * Supports:
+   * - Full HTML documents (<!DOCTYPE html>...)
+   * - Markdown code blocks (```html...```)
+   * - Plain HTML fragments
+   * 
+   * @private
+   * @param {string} text - Raw text from AI response
+   * @returns {string} Extracted HTML code
+   * 
+   * @example
+   * ```typescript
+   * // Handles markdown
+   * const html = this.extractRobustHtml("```html\n<div>Hello</div>\n```");
+   * // Returns: "<div>Hello</div>"
+   * 
+   * // Handles full documents
+   * const html = this.extractRobustHtml("<!DOCTYPE html>...");
+   * // Returns: Complete HTML document
+   * ```
+   */
   private extractRobustHtml(text: string): string {
     const trimmed = text.trim();
     const fullDocMatch = trimmed.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);

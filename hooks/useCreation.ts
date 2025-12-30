@@ -9,6 +9,14 @@ import { geminiService } from '../services/gemini';
 import { liveDesignService } from '../services/live';
 import { fileToBase64 } from '../utils/fileHelpers';
 
+// File upload constraints
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
+const MIN_PROMPT_LENGTH = 3;
+
+// Default theme configuration
+const DEFAULT_THEME: ThemeState = { h: 217, s: 91, l: 60 };
+
 const INITIAL_STATE: GenerationState = {
   isLoading: false,
   isListening: false,
@@ -16,6 +24,39 @@ const INITIAL_STATE: GenerationState = {
   progressStep: 0,
 };
 
+/**
+ * useCreation Hook
+ * 
+ * Manages the complete lifecycle of artifact creation, from initial generation
+ * through iterative refinement via text and voice input.
+ * 
+ * Features:
+ * - Initial generation from prompt + optional image
+ * - Text-to-image generation
+ * - Conversational refinement (text + voice)
+ * - Theme customization
+ * - Design persona switching
+ * - State management for loading, errors, voice input
+ * 
+ * @param {Function} onCreationFinalized - Callback when a creation is completed or updated
+ * @returns {Object} Creation state and control methods
+ * 
+ * @example
+ * ```typescript
+ * const { 
+ *   activeCreation,
+ *   isGenerating,
+ *   generateFromPrompt,
+ *   refine 
+ * } = useCreation(addCreation);
+ * 
+ * // Generate from prompt
+ * await generateFromPrompt("Create a dashboard", imageFile);
+ * 
+ * // Refine with text
+ * await refine("Make the header blue");
+ * ```
+ */
 export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
   const [activeCreation, setActiveCreation] = useState<Creation | null>(null);
   const [state, setState] = useState<GenerationState>(INITIAL_STATE);
@@ -95,6 +136,24 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
   }, [state.isListening, refine]);
 
   const generateFromPrompt = useCallback(async (promptText: string, file?: File) => {
+    // Input validation
+    if (!promptText || promptText.trim().length < MIN_PROMPT_LENGTH) {
+      setState(s => ({ ...s, error: `Prompt must be at least ${MIN_PROMPT_LENGTH} characters long.` }));
+      return;
+    }
+
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        setState(s => ({ ...s, error: `File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit.` }));
+        return;
+      }
+
+      if (!ALLOWED_FILE_TYPES.includes(file.type.toLowerCase())) {
+        setState(s => ({ ...s, error: "Unsupported file type. Please use PNG, JPG, WebP, or PDF." }));
+        return;
+      }
+    }
+
     setState(s => ({ ...s, isLoading: true, error: null, progressStep: 0 }));
     try {
       let imageBase64: string | undefined;
@@ -114,7 +173,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
         originalImage: imageBase64 && mimeType ? `data:${mimeType};base64,${imageBase64}` : undefined,
         timestamp: new Date(),
         chatHistory: [{ role: 'user', text: promptText, timestamp: new Date() }],
-        theme: { h: 217, s: 91, l: 60 },
+        theme: DEFAULT_THEME,
         persona
       };
       
@@ -140,7 +199,7 @@ export const useCreation = (onCreationFinalized: (c: Creation) => void) => {
         originalImage: `data:${mimeType};base64,${base64}`,
         timestamp: new Date(),
         chatHistory: [{ role: 'user', text: prompt, timestamp: new Date() }],
-        theme: { h: 217, s: 91, l: 60 },
+        theme: DEFAULT_THEME,
         persona
       };
 

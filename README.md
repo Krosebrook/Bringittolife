@@ -1,3 +1,5 @@
+<div align="center">
+
 # Manifestation Lab v3.0
 
 [![CI/CD](https://github.com/Krosebrook/Bringittolife/actions/workflows/ci.yml/badge.svg)](https://github.com/Krosebrook/Bringittolife/actions/workflows/ci.yml)
@@ -62,11 +64,32 @@ npm run dev
 
 ## 🛠️ Technical Stack
 
-- **Framework**: React 19.2
-- **Styling**: Tailwind CSS (Dynamic Play CDN)
-- **AI Engine**: Google Gemini API (@google/genai)
-- **Icons**: Heroicons v2.2
-- **Visuals**: PDF.js, CSS Dot Grid, Noise Textures
+<table>
+<tr>
+<td><b>Frontend</b></td>
+<td>React 19.2, TypeScript 5.8, Vite 6.2</td>
+</tr>
+<tr>
+<td><b>Styling</b></td>
+<td>Tailwind CSS (Dynamic Play CDN)</td>
+</tr>
+<tr>
+<td><b>AI Engine</b></td>
+<td>Google Gemini 3 Pro, Gemini 2.5 Flash</td>
+</tr>
+<tr>
+<td><b>Icons</b></td>
+<td>Heroicons v2.2</td>
+</tr>
+<tr>
+<td><b>PWA</b></td>
+<td>Service Worker, Offline-First Architecture</td>
+</tr>
+</table>
+
+**Browser Support**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+
+---
 
 ## 📚 Documentation
 
@@ -232,7 +255,7 @@ git push origin feature/your-feature-name
 
 ---
 
-## 🤖 AI-Assisted Development
+<div align="center">
 
 This project includes comprehensive documentation for AI-assisted development:
 

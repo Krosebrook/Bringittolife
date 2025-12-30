@@ -1,0 +1,27 @@
+# Prettier ignore file
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+
+# Generated files
+*.min.js
+*.min.css
+
+# Config files (often have specific formatting)
+*.json
+
+# Documentation that shouldn't be reformatted
+CHANGELOG.md
+LICENSE

@@ -1,459 +1,680 @@
 # Contributing to Manifestation Lab
 
-Thank you for your interest in contributing to Manifestation Lab! This document provides guidelines and best practices for contributing to the project.
+Thank you for your interest in contributing to Manifestation Lab! This document provides guidelines and instructions for contributing to the project.
+
+---
 
 ## Table of Contents
 
 1. [Code of Conduct](#code-of-conduct)
 2. [Getting Started](#getting-started)
 3. [Development Setup](#development-setup)
-4. [Project Structure](#project-structure)
-5. [Coding Standards](#coding-standards)
-6. [Commit Guidelines](#commit-guidelines)
-7. [Pull Request Process](#pull-request-process)
-8. [Testing Guidelines](#testing-guidelines)
-9. [Documentation](#documentation)
-10. [AI-Assisted Development](#ai-assisted-development)
+4. [How to Contribute](#how-to-contribute)
+5. [Code Guidelines](#code-guidelines)
+6. [Testing Guidelines](#testing-guidelines)
+7. [Documentation Guidelines](#documentation-guidelines)
+8. [Pull Request Process](#pull-request-process)
+9. [Issue Guidelines](#issue-guidelines)
+10. [Community](#community)
+
+---
 
 ## Code of Conduct
 
-This project adheres to a Code of Conduct that all contributors are expected to follow. Please read [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) before contributing.
+### Our Pledge
+
+We are committed to providing a welcoming and inclusive environment for all contributors, regardless of age, body size, disability, ethnicity, gender identity, level of experience, nationality, personal appearance, race, religion, or sexual identity and orientation.
+
+### Our Standards
+
+**Positive behaviors include:**
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints and experiences
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
+
+**Unacceptable behaviors include:**
+- Harassment, trolling, or derogatory comments
+- Publishing others' private information without permission
+- Other conduct which could reasonably be considered inappropriate
+
+### Enforcement
+
+Project maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, issues, and other contributions that do not align with this Code of Conduct.
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-- **Git**: v2.30.0 or higher
-- **Google Gemini API Key**: Required for AI features
+Before contributing, ensure you have:
+- Node.js 18+ installed
+- npm or yarn package manager
+- Git for version control
+- A GitHub account
+- A Google Gemini API key (for testing)
 
-### First-Time Setup
+### First-Time Contributors
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork**:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Bringittolife.git
-   cd Bringittolife
-   ```
-3. **Add upstream remote**:
-   ```bash
-   git remote add upstream https://github.com/Krosebrook/Bringittolife.git
-   ```
-4. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-5. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your GEMINI_API_KEY
-   ```
-6. **Start development server**:
-   ```bash
-   npm run dev
-   ```
+If you're new to open source:
+1. Read through existing issues labeled `good first issue`
+2. Explore the codebase to understand the structure
+3. Review the [ARCHITECTURE.md](./ARCHITECTURE.md) document
+4. Start with documentation or small bug fixes
+
+---
 
 ## Development Setup
 
-### Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-GEMINI_API_KEY=your_api_key_here
-```
-
-**⚠️ Security Note**: Never commit API keys to the repository. The `.env` file is gitignored.
-
-### Running the Application
+### 1. Fork and Clone
 
 ```bash
-# Development server (port 3000)
+# Fork the repository on GitHub, then clone your fork
+git clone https://github.com/YOUR_USERNAME/Bringittolife.git
+cd Bringittolife
+
+# Add upstream remote
+git remote add upstream https://github.com/Krosebrook/Bringittolife.git
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Add your API key to .env
+echo "GEMINI_API_KEY=your_api_key_here" >> .env
+```
+
+### 4. Start Development Server
+
+```bash
 npm run dev
-
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
 ```
 
-### Development Tools
+The application will be available at `http://localhost:3000`.
 
-We recommend using:
-- **VS Code** with extensions:
-  - ESLint
-  - Prettier
-  - TypeScript and JavaScript Language Features
-  - Tailwind CSS IntelliSense
-  - Error Lens
-- **React Developer Tools** browser extension
-- **GitHub Copilot** (optional, but recommended)
+### 5. Verify Setup
 
-## Project Structure
+- Open the application in your browser
+- Try generating a simple artifact from text
+- Check the console for errors
+
+---
+
+## How to Contribute
+
+### Types of Contributions
+
+We welcome various types of contributions:
+
+1. **Bug Fixes** 🐛
+   - Fix broken functionality
+   - Resolve edge cases
+   - Improve error handling
+
+2. **Features** ✨
+   - New capabilities
+   - UI/UX improvements
+   - Integration enhancements
+
+3. **Documentation** 📚
+   - Fix typos or unclear explanations
+   - Add examples
+   - Improve guides
+
+4. **Testing** 🧪
+   - Write unit tests
+   - Add integration tests
+   - Improve test coverage
+
+5. **Performance** ⚡
+   - Optimize slow operations
+   - Reduce bundle size
+   - Improve rendering
+
+6. **Refactoring** 🔧
+   - Improve code structure
+   - Enhance type safety
+   - Remove technical debt
+
+### Contribution Workflow
 
 ```
-Bringittolife/
-├── components/          # React components
-│   ├── live/           # Live preview & dev tools
-│   ├── hero/           # Landing page components
-│   ├── layout/         # Layout components
-│   └── ui/             # Reusable UI components
-├── services/           # API integrations
-│   ├── gemini.ts       # Primary AI service
-│   ├── live.ts         # Voice/audio service
-│   └── docsService.ts  # Documentation generation
-├── hooks/              # Custom React hooks
-│   ├── useCreation.ts  # Creation lifecycle management
-│   ├── useHistory.ts   # LocalStorage persistence
-│   ├── useIframeContent.ts # Iframe injection
-│   └── usePanZoom.ts   # Canvas navigation
-├── utils/              # Utility functions
-│   ├── fileHelpers.ts  # File operations
-│   ├── injection.ts    # Iframe content injection
-│   └── reactConverter.ts # HTML → React conversion
-├── types.ts            # Global TypeScript types
-├── App.tsx             # Main application
-└── index.tsx           # Entry point
+1. Find/Create Issue → 2. Fork & Branch → 3. Develop → 4. Test → 5. Pull Request
 ```
 
-## Coding Standards
+---
 
-### TypeScript
+## Code Guidelines
 
-- **Always use TypeScript** - Avoid `any`, prefer `unknown` for dynamic types
-- **Define interfaces** for all component props and function parameters
-- **Prefer `interface`** over `type` for object shapes
-- **Use utility types**: `Partial<T>`, `Pick<T, K>`, `Omit<T, K>`
-- **Export types** that may be reused
+### TypeScript Style
 
-Example:
+**DO ✅**
+
 ```typescript
-interface ButtonProps {
-  label: string;
-  onClick: () => void;
-  variant?: 'primary' | 'secondary';
-  disabled?: boolean;
+// Use interfaces for object types
+interface ArtifactProps {
+  artifact: Artifact;
+  onSelect: (id: string) => void;
 }
 
-export function Button({ label, onClick, variant = 'primary', disabled }: ButtonProps) {
-  // Component implementation
+// Use function components
+export function ArtifactCard({ artifact, onSelect }: ArtifactProps) {
+  // Implementation
+}
+
+// Always type function returns
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+// Use descriptive variable names
+const isGenerating = state.isLoading;
+const hasError = !!error;
+```
+
+**DON'T ❌**
+
+```typescript
+// Don't use 'any' type
+function process(data: any) { }
+
+// Don't use 'type' for object interfaces (prefer 'interface')
+type Props = { name: string };
+
+// Don't use single-letter variables (except in short loops)
+const a = data.filter(x => x.active);
+
+// Don't skip return type annotations
+function calculate(x: number) {
+  return x * 2;
 }
 ```
 
-### React Components
+### React Patterns
 
-- **Use function components** with hooks (no class components)
-- **Destructure props** in function parameters
-- **Use meaningful names**: `PascalCase` for components, `camelCase` for functions
-- **One component per file** (except tightly coupled sub-components)
-- **Export at the bottom** of the file for better code organization
+**Component Structure:**
 
-Example:
 ```typescript
-import { useState, useCallback } from 'react';
-import { SomeType } from '../types';
+/**
+ * Brief description of component purpose
+ */
+export function ComponentName({ prop1, prop2 }: ComponentNameProps) {
+  // 1. Hooks (useState, useEffect, custom hooks)
+  const [state, setState] = useState<StateType>(initialValue);
+  const customValue = useCustomHook();
 
-interface Props {
-  data: SomeType;
-  onUpdate: (value: string) => void;
-}
+  // 2. Derived state and memoization
+  const derivedValue = useMemo(() => {
+    return expensiveCalculation(state);
+  }, [state]);
 
-export function MyComponent({ data, onUpdate }: Props) {
-  const [state, setState] = useState('');
-  
-  const handleChange = useCallback((value: string) => {
-    setState(value);
-    onUpdate(value);
-  }, [onUpdate]);
+  // 3. Event handlers
+  const handleClick = useCallback(() => {
+    // Handler logic
+  }, [dependencies]);
 
+  // 4. Effects
+  useEffect(() => {
+    // Effect logic
+    return () => {
+      // Cleanup
+    };
+  }, [dependencies]);
+
+  // 5. Render
   return (
-    <div className="p-4">
-      {/* Component JSX */}
+    <div className="container">
+      {/* JSX */}
     </div>
   );
 }
 ```
 
-### Hooks
+**Hooks Best Practices:**
 
-- **Follow React Hooks rules**:
-  - Only call hooks at the top level
-  - Only call hooks from React functions
-- **Custom hooks must start with `use`**
-- **Document complex hooks** with JSDoc comments
-- **Memoize callbacks** with `useCallback` when passed to child components
-- **Memoize expensive computations** with `useMemo`
+```typescript
+// ✅ Good: Meaningful hook names with 'use' prefix
+function useArtifactGeneration(prompt: string) {
+  const [artifact, setArtifact] = useState<Artifact | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Hook logic
+  
+  return { artifact, loading };
+}
 
-### Styling
+// ✅ Good: Proper dependency arrays
+useEffect(() => {
+  fetchData(id);
+}, [id]); // Only re-run when id changes
 
-- **Use Tailwind CSS utility classes** exclusively
-- **Group utilities** logically: layout → spacing → typography → colors
-- **Use `cn()` helper** for conditional classes
-- **Avoid inline styles** unless absolutely necessary
-- **Use semantic color names** from Tailwind palette
-
-Example:
-```tsx
-<button 
-  className="
-    flex items-center gap-2 
-    px-4 py-2 rounded-lg
-    text-sm font-medium
-    bg-indigo-600 text-white
-    hover:bg-indigo-700 active:bg-indigo-800
-    disabled:opacity-50 disabled:cursor-not-allowed
-    transition-colors duration-200
-  "
->
-  Submit
-</button>
+// ❌ Bad: Missing dependencies
+useEffect(() => {
+  fetchData(id);
+}, []); // Will use stale id
 ```
+
+### Styling with Tailwind
+
+**DO ✅**
+
+```tsx
+// Group utilities logically: layout → spacing → typography → colors
+<button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+  Generate
+</button>
+
+// Use Tailwind's responsive utilities
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+// Use the cn() helper for conditional classes
+<div className={cn(
+  "base-class",
+  isActive && "active-class",
+  isDisabled && "disabled-class"
+)}>
+```
+
+**DON'T ❌**
+
+```tsx
+// Don't use inline styles
+<div style={{ padding: '16px', color: 'blue' }}>
+
+// Don't create custom CSS classes
+<style>{`.my-custom-class { padding: 16px; }`}</style>
+
+// Don't use arbitrary values without good reason
+<div className="p-[13px]"> // Use p-3 or p-4 instead
+```
+
+### File Organization
+
+```
+src/
+├── components/          # React components
+│   ├── live/           # Live preview features
+│   ├── hero/           # Landing page sections
+│   ├── layout/         # Layout components
+│   └── ui/             # Reusable UI components
+├── hooks/              # Custom React hooks
+├── services/           # API and external services
+├── utils/              # Helper functions
+├── types.ts            # Global TypeScript types
+└── App.tsx             # Main application component
+```
+
+**Naming Conventions:**
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Components | PascalCase | `InputArea.tsx` |
+| Hooks | camelCase with "use" | `useHistory.ts` |
+| Utils | camelCase | `fileHelpers.ts` |
+| Types/Interfaces | PascalCase | `interface Artifact` |
+| Constants | UPPER_SNAKE_CASE | `MAX_HISTORY_ITEMS` |
 
 ### Error Handling
 
-- **Always wrap async operations** in try-catch blocks
-- **Provide user-friendly error messages**
-- **Log errors for debugging**: `console.error('[Context]', error)`
-- **Offer recovery actions** when possible
-- **Validate input** before processing
-
-Example:
 ```typescript
-try {
-  setState({ loading: true, error: null });
-  const result = await geminiService.generateArtifact(prompt);
-  setState({ loading: false, data: result });
-} catch (error) {
-  console.error('[GenerateArtifact]', error);
-  setState({ 
-    loading: false, 
-    error: 'Failed to generate artifact. Please try again.' 
-  });
+// ✅ Good: Specific error handling with user-friendly messages
+async function generateArtifact(prompt: string) {
+  try {
+    const result = await geminiService.generateArtifact(prompt);
+    return result;
+  } catch (error) {
+    if (error instanceof APIError) {
+      if (error.code === 'QUOTA_EXCEEDED') {
+        throw new Error('API quota exceeded. Please try again later.');
+      } else if (error.code === 'INVALID_KEY') {
+        throw new Error('API key is invalid. Please check configuration.');
+      }
+    }
+    
+    // Log for debugging
+    console.error('[Generation] Unexpected error:', error);
+    throw new Error('Generation failed. Please try again.');
+  }
+}
+
+// ✅ Good: Graceful degradation
+function getStoredHistory(): Creation[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.warn('Failed to load history:', error);
+    return []; // Fallback to empty
+  }
 }
 ```
 
-### Accessibility
+### Comments and Documentation
 
-- **Use semantic HTML**: `<nav>`, `<main>`, `<article>`, `<button>`
-- **Add ARIA labels** for icon-only buttons
-- **Ensure keyboard navigation** for all interactive elements
-- **Maintain color contrast** (WCAG AA minimum)
-- **Provide focus indicators** for all focusable elements
+```typescript
+/**
+ * Generates a complete HTML artifact from a prompt and optional image.
+ * 
+ * @param prompt - User's text description of desired artifact
+ * @param image - Optional base64-encoded image
+ * @param persona - Design system to apply (default: 'modernist')
+ * @returns Promise resolving to generated HTML and metadata
+ * @throws {Error} If API request fails or quota exceeded
+ * 
+ * @example
+ * const result = await generateArtifact(
+ *   "Create a todo app",
+ *   undefined,
+ *   'modernist'
+ * );
+ */
+async function generateArtifact(
+  prompt: string,
+  image?: string,
+  persona: DesignPersona = 'modernist'
+): Promise<GenerationResult> {
+  // Implementation
+}
 
-## Commit Guidelines
-
-We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
-
-### Commit Message Format
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Types
-
-- **feat**: New feature
-- **fix**: Bug fix
-- **docs**: Documentation changes
-- **style**: Code style changes (formatting, no logic changes)
-- **refactor**: Code refactoring (no feature/fix)
-- **perf**: Performance improvements
-- **test**: Adding or updating tests
-- **chore**: Maintenance tasks, dependency updates
-- **ci**: CI/CD changes
-
-### Examples
-
-```bash
-feat(live-preview): add voice-to-text refinement
-
-Implemented WebRTC-based audio streaming with Gemini 2.5 Flash
-for real-time voice-to-text artifact refinement.
-
-Closes #123
+// Use inline comments for complex logic
+function pruneHistory(history: Creation[]): Creation[] {
+  // Step 1: Remove images from all but the 3 most recent items
+  const pruned = history.map((item, idx) =>
+    idx > 2 ? { ...item, originalImage: undefined } : item
+  );
+  
+  // Step 2: If still too large, remove HTML from older items
+  // Keep only metadata for historical reference
+  return pruned;
+}
 ```
 
-```bash
-fix(gemini): handle missing API key gracefully
+---
 
-Added proper error handling when GEMINI_API_KEY is not configured.
-Shows user-friendly error message with setup instructions.
+## Testing Guidelines
+
+### Test Structure (Future)
+
+When test infrastructure is added, follow these patterns:
+
+```typescript
+// ComponentName.test.tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import { ComponentName } from './ComponentName';
+
+describe('ComponentName', () => {
+  it('renders without crashing', () => {
+    render(<ComponentName />);
+    expect(screen.getByText('Expected Text')).toBeInTheDocument();
+  });
+
+  it('handles user interaction correctly', async () => {
+    const onClickMock = vi.fn();
+    render(<ComponentName onClick={onClickMock} />);
+    
+    fireEvent.click(screen.getByRole('button'));
+    expect(onClickMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays error state appropriately', () => {
+    render(<ComponentName error="Test error" />);
+    expect(screen.getByText('Test error')).toBeInTheDocument();
+  });
+});
 ```
 
-```bash
-docs(readme): update installation instructions
+### Manual Testing Checklist
 
-Added prerequisites section and troubleshooting guide.
-```
+Until automated tests are implemented, manually verify:
+
+- [ ] Component renders correctly
+- [ ] User interactions work as expected
+- [ ] Error states display appropriately
+- [ ] Loading states show correctly
+- [ ] Responsive design works on mobile/tablet/desktop
+- [ ] Accessibility features function (keyboard nav, ARIA labels)
+- [ ] Changes don't break existing functionality
+
+---
+
+## Documentation Guidelines
+
+### Code Documentation
+
+- Document all public APIs with JSDoc
+- Explain "why" in comments, not "what" (code should be self-explanatory)
+- Update documentation when changing functionality
+- Include examples for complex features
+
+### Markdown Documentation
+
+- Use clear, concise language
+- Include code examples
+- Add table of contents for long documents
+- Use headings consistently
+- Add links to related documentation
+
+### README Updates
+
+When adding features, update README.md:
+- Add to feature list if user-facing
+- Update setup instructions if needed
+- Include usage examples
+- Update screenshots if UI changed
+
+---
 
 ## Pull Request Process
 
 ### Before Submitting
 
-1. **Update your fork**:
+1. **Sync with upstream**
    ```bash
    git fetch upstream
-   git merge upstream/main
+   git rebase upstream/main
    ```
 
-2. **Create a feature branch**:
+2. **Test your changes**
+   - Manual testing of affected features
+   - Check console for errors
+   - Verify in different browsers
+
+3. **Review your changes**
    ```bash
-   git checkout -b feat/your-feature-name
+   git diff upstream/main
    ```
 
-3. **Make your changes** following coding standards
+4. **Update documentation**
+   - Update relevant .md files
+   - Add JSDoc comments
+   - Update CHANGELOG.md
 
-4. **Test thoroughly**:
+### Creating a Pull Request
+
+1. **Push to your fork**
    ```bash
-   npm run dev  # Test in development
-   npm run build  # Ensure production build works
+   git push origin feature-branch-name
    ```
 
-5. **Commit your changes** using conventional commits
+2. **Open PR on GitHub**
+   - Use descriptive title: "Add dark mode toggle" not "Update"
+   - Reference related issues: "Fixes #123"
+   - Provide detailed description
 
-6. **Push to your fork**:
+3. **PR Description Template**
+   ```markdown
+   ## Description
+   Brief summary of changes
+
+   ## Motivation
+   Why this change is needed
+
+   ## Changes Made
+   - Bullet list of specific changes
+   - Include file names
+
+   ## Testing Done
+   - How you tested
+   - What scenarios you verified
+
+   ## Screenshots (if applicable)
+   [Add screenshots for UI changes]
+
+   ## Checklist
+   - [ ] Code follows project style guidelines
+   - [ ] Self-reviewed the changes
+   - [ ] Commented complex code
+   - [ ] Updated documentation
+   - [ ] Changes generate no new warnings
+   - [ ] Tested on multiple browsers (if UI change)
+   ```
+
+### PR Review Process
+
+1. **Automated Checks** (future)
+   - Linting
+   - Type checking
+   - Unit tests
+   - Build verification
+
+2. **Code Review**
+   - Maintainer reviews code
+   - Provides feedback or requests changes
+   - Approves when ready
+
+3. **Addressing Feedback**
    ```bash
-   git push origin feat/your-feature-name
+   # Make requested changes
+   git add .
+   git commit -m "Address review feedback"
+   git push origin feature-branch-name
    ```
 
-### Submitting the PR
+4. **Merge**
+   - Maintainer merges when approved
+   - PR automatically closes related issues
 
-1. Go to the [Bringittolife repository](https://github.com/Krosebrook/Bringittolife)
-2. Click "New Pull Request"
-3. Select your fork and branch
-4. Fill out the PR template completely
-5. Link related issues using keywords: `Closes #123`, `Fixes #456`
+---
 
-### PR Requirements
+## Issue Guidelines
 
-- [ ] Code follows project style guidelines
-- [ ] Changes are documented in code comments where necessary
-- [ ] README or documentation updated if needed
-- [ ] No console errors or warnings
-- [ ] Build succeeds (`npm run build`)
-- [ ] All new code has TypeScript types
-- [ ] Accessibility guidelines followed
-- [ ] Security best practices followed
+### Creating Issues
 
-### Review Process
+**Bug Reports:**
 
-- Maintainers will review your PR within 3-5 business days
-- Address feedback by pushing additional commits
-- Once approved, a maintainer will merge your PR
-- Delete your feature branch after merging
+```markdown
+**Bug Description**
+Clear description of the bug
 
-## Testing Guidelines
+**Steps to Reproduce**
+1. Go to '...'
+2. Click on '...'
+3. See error
 
-### Manual Testing Checklist
+**Expected Behavior**
+What should happen
 
-When making changes, test:
-- [ ] Image upload and processing
-- [ ] Text prompt generation
-- [ ] Text-to-image generation
-- [ ] Voice refinement (if applicable)
-- [ ] Live preview rendering
-- [ ] Export functionality (HTML, React, PDF)
-- [ ] Design persona switching
-- [ ] Theme customization
-- [ ] CSS editor (if applicable)
-- [ ] Accessibility panel (if applicable)
-- [ ] LocalStorage persistence
-- [ ] PWA installation
+**Actual Behavior**
+What actually happens
 
-### Browser Testing
+**Environment**
+- Browser: Chrome 120
+- OS: macOS 14
+- Node: 18.17.0
 
-Test on:
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest, if available)
-
-### Device Testing
-
-Test responsive behavior on:
-- Desktop (1920x1080)
-- Tablet (768x1024)
-- Mobile (375x667)
-
-## Documentation
-
-### Code Documentation
-
-- **Add JSDoc comments** for complex functions and services
-- **Document parameters** and return types
-- **Include examples** for non-obvious usage
-- **Explain "why"**, not just "what"
-
-Example:
-```typescript
-/**
- * Converts an HTML string into a React component string with proper formatting.
- * 
- * Handles:
- * - Semantic element detection and component extraction
- * - State mapping for interactive elements (inputs, selects)
- * - Attribute conversion (class → className, for → htmlFor)
- * 
- * @param html - Raw HTML string from Gemini API
- * @returns Formatted React component as a string
- * 
- * @example
- * const reactCode = convertToReact('<div class="btn">Click me</div>');
- * // Returns: '<div className="btn">Click me</div>'
- */
-export function convertToReact(html: string): string {
-  // Implementation
-}
+**Screenshots**
+[If applicable]
 ```
 
-### README Updates
+**Feature Requests:**
 
-Update the README when:
-- Adding new features
-- Changing setup process
-- Modifying dependencies
-- Adding new scripts or commands
+```markdown
+**Feature Description**
+Clear description of the proposed feature
 
-## AI-Assisted Development
+**Use Case**
+Why this feature is needed
 
-This project embraces AI-assisted development:
+**Proposed Solution**
+How you envision this working
 
-### Using GitHub Copilot
+**Alternatives Considered**
+Other approaches you've thought about
 
-- Refer to [.github/copilot-instructions.md](./.github/copilot-instructions.md)
-- Follow the established patterns in [COPILOT_PROMPT.md](./COPILOT_PROMPT.md)
-- Always review and test AI-generated code
+**Additional Context**
+Any other relevant information
+```
 
-### Using AI Prompts
+### Issue Labels
 
-- See [GITHUB_AGENT_PROMPTS.md](./GITHUB_AGENT_PROMPTS.md) for engineered prompts
-- Adapt prompts for your specific use case
-- Document any new patterns you discover
+| Label | Purpose |
+|-------|---------|
+| `bug` | Something isn't working |
+| `enhancement` | New feature or request |
+| `documentation` | Documentation improvements |
+| `good first issue` | Good for newcomers |
+| `help wanted` | Extra attention needed |
+| `question` | Further information requested |
+| `wontfix` | Will not be worked on |
+| `duplicate` | Already reported |
 
-### Best Practices
+---
 
-- **Always review** AI-generated code for correctness
-- **Test thoroughly** before committing
-- **Follow project conventions** over AI suggestions
-- **Document AI-assisted changes** in commit messages if relevant
+## Community
 
-## Getting Help
+### Communication Channels
 
-- **Documentation**: Start with [README.md](./README.md) and [SUMMARY.md](./SUMMARY.md)
-- **Issues**: Search [existing issues](https://github.com/Krosebrook/Bringittolife/issues)
-- **Discussions**: Use [GitHub Discussions](https://github.com/Krosebrook/Bringittolife/discussions)
-- **Discord**: Join our [Discord community](https://discord.gg/manifestation-lab) (if applicable)
+- **GitHub Issues**: Bug reports and feature requests
+- **GitHub Discussions**: General questions and ideas
+- **Pull Requests**: Code contributions and reviews
 
-## Recognition
+### Getting Help
 
-Contributors will be:
-- Listed in [CONTRIBUTORS.md](./CONTRIBUTORS.md)
-- Mentioned in release notes
-- Given credit in the project README
+If you're stuck:
+1. Check existing documentation (README, ARCHITECTURE, AUDIT)
+2. Search closed issues for similar problems
+3. Open a new issue with detailed information
+4. Be patient - maintainers volunteer their time
 
-Thank you for contributing to Manifestation Lab! 🚀
+### Recognition
+
+Contributors are recognized in:
+- GitHub contributor graph
+- CHANGELOG.md (for significant contributions)
+- Release notes
+
+---
+
+## License
+
+By contributing to Manifestation Lab, you agree that your contributions will be licensed under the Apache License 2.0.
+
+---
+
+## Questions?
+
+If you have questions about contributing:
+1. Check this guide thoroughly
+2. Review existing issues and PRs
+3. Open a GitHub Discussion
+4. Tag maintainers if urgent
+
+---
+
+Thank you for contributing to Manifestation Lab! Your efforts help make this project better for everyone. 🚀
+
+---
+
+**Last Updated:** December 29, 2024  
+**Contributors:** See [GitHub Contributors](https://github.com/Krosebrook/Bringittolife/graphs/contributors)

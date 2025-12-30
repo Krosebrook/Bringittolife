@@ -46,7 +46,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Use placeholder if secret not configured (build will still work)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'placeholder_key_for_build_only' }}
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3

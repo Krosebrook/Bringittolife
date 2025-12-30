@@ -66,8 +66,8 @@ if [ ! -f .env ]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         read -p "Enter your Gemini API key: " API_KEY
-        sed -i.bak "s/your_gemini_api_key_here/$API_KEY/" .env
-        rm .env.bak 2>/dev/null || true
+        # Use awk to safely replace, avoiding sed delimiter issues
+        awk -v key="$API_KEY" '{gsub(/your_gemini_api_key_here/, key)}1' .env > .env.tmp && mv .env.tmp .env
         echo -e "${GREEN}✓ API key configured${NC}"
     else
         echo -e "${YELLOW}⚠ Get your API key from: https://makersuite.google.com/app/apikey${NC}"

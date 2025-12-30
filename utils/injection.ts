@@ -187,15 +187,16 @@ export const ACCESSIBILITY_AUDIT_SCRIPT = `
         const ariaLabel = el.getAttribute('aria-label');
         const ariaLabelledBy = el.getAttribute('aria-labelledby');
         const hasAccessibleName = text || ariaLabel || ariaLabelledBy;
+        const tag = el.tagName.toLowerCase();
         
         if (!hasAccessibleName) {
           issues.push({
             id: 'missing-label-' + i,
             type: 'critical',
-            element: el.tagName.toLowerCase(),
+            element: tag,
             message: 'Interactive element has no accessible name.',
             suggestion: 'Add an aria-label attribute or inner text that describes the action.',
-            selector: el.id ? '#' + el.id : el.tagName.toLowerCase() + ':nth-child(' + (i+1) + ')'
+            selector: el.id ? '#' + el.id : tag + ':nth-of-type(' + (i+1) + ')'
           });
         }
       });
@@ -210,7 +211,7 @@ export const ACCESSIBILITY_AUDIT_SCRIPT = `
             element: 'img',
             message: 'Image is missing an alt attribute.',
             suggestion: 'Add an alt="" attribute for decorative images, or a descriptive alternative text for informative images.',
-            selector: img.id ? '#' + img.id : 'img:nth-child(' + (i+1) + ')'
+            selector: img.id ? '#' + img.id : 'img:nth-of-type(' + (i+1) + ')'
           });
         }
       });
@@ -244,7 +245,7 @@ export const ACCESSIBILITY_AUDIT_SCRIPT = `
             element: 'input',
             message: 'Form input has no associated label.',
             suggestion: 'Use a <label for="' + (id || 'id') + '"> element or add an aria-label to identify the field.',
-            selector: id ? '#' + id : 'input:nth-child(' + (i+1) + ')'
+            selector: id ? '#' + id : 'input:nth-of-type(' + (i+1) + ')'
           });
         }
       });
@@ -281,6 +282,27 @@ export const ACCESSIBILITY_AUDIT_SCRIPT = `
             selector: el.id ? '#' + el.id : el.tagName.toLowerCase() + ':nth-of-type(' + (i+1) + ')'
           });
         }
+      });
+
+      // 7. Check for Ambiguous Interactive Elements (Ambiguous Roles)
+      // Detects non-native elements (div/span) that appear interactive (cursor pointer, tabindex, onclick) but lack a role.
+      const ambiguousSelectors = '[tabindex], [onclick], .cursor-pointer';
+      const ambiguous = document.querySelectorAll(ambiguousSelectors);
+      ambiguous.forEach((el, i) => {
+          const tag = el.tagName.toLowerCase();
+          // Skip native interactive elements that imply a role
+          if (['a', 'button', 'input', 'select', 'textarea', 'summary', 'details', 'iframe', 'video', 'audio'].includes(tag)) return;
+          
+          if (!el.hasAttribute('role')) {
+             issues.push({
+                 id: 'ambiguous-role-' + i,
+                 type: 'warning',
+                 element: tag,
+                 message: 'Element appears interactive but lacks a semantic role.',
+                 suggestion: 'Add role="button" (or appropriate ARIA role) to ' + tag + ' elements that handle user interaction.',
+                 selector: el.id ? '#' + el.id : tag + ':nth-of-type(' + (i+1) + ')'
+             });
+          }
       });
 
       window.parent.postMessage({ type: 'accessibility-audit', issues }, '*');

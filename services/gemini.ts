@@ -3,8 +3,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { GoogleGenAI, Part } from "@google/genai";
-import { GeneratedImageResult, ChatMessage, DesignPersona } from "../types";
+import { GoogleGenAI, Part, Type } from "@google/genai";
+import { GeneratedImageResult, ChatMessage, DesignPersona, PipelineStep } from "../types";
 
 const PERSONA_INSTRUCTIONS: Record<DesignPersona, string> = {
   modernist: "Focus on clean typography (Inter), ample whitespace, and subtle gradients. High precision grids with minimal borders.",
@@ -109,6 +109,45 @@ class GeminiService {
       base64: part.inlineData.data, 
       mimeType: part.inlineData.mimeType || 'image/png' 
     };
+  }
+
+  async suggestPipeline(code: string): Promise<PipelineStep[]> {
+    const ai = this.getClient();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Analyze the following web artifact code and generate a realistic CI/CD pipeline JSON structure. 
+      Tailor the steps (Lint, Test, Build, Deploy) based on the complexity (e.g. simple static sites need less steps than complex apps).
+      
+      Code Snippet:
+      ${code.slice(0, 5000)}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              name: { type: Type.STRING },
+              type: { type: Type.STRING, enum: ['lint', 'test', 'build', 'deploy'] },
+              status: { type: Type.STRING, enum: ['pending', 'active', 'success', 'failed'] }
+            },
+            required: ['id', 'name', 'type', 'status']
+          }
+        }
+      }
+    });
+
+    try {
+      const steps = JSON.parse(response.text || "[]");
+      return steps;
+    } catch (e) {
+      console.error("Pipeline synthesis failed", e);
+      return [
+        { id: '1', name: 'Lint (Standard)', type: 'lint', status: 'pending' },
+        { id: '2', name: 'Build', type: 'build', status: 'pending' }
+      ];
+    }
   }
 
   private extractRobustHtml(text: string): string {

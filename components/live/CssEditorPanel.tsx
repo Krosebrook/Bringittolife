@@ -34,8 +34,8 @@ interface CssEditorPanelProps {
 }
 
 /**
- * ADVANCED CSS SYNTAX HIGHLIGHTER v2.2
- * Provides semantic tokenization for better visual clarity.
+ * ADVANCED CSS SYNTAX HIGHLIGHTER v3.0
+ * Provides semantic tokenization including media queries and keyframes.
  */
 const highlightCSS = (code: string) => {
   return code
@@ -44,8 +44,11 @@ const highlightCSS = (code: string) => {
     .replace(/>/g, "&gt;")
     // Comments
     .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="text-zinc-500 italic">$1</span>')
+    // At-Rules (Media, Keyframes, Import)
+    .replace(/(@[a-z-]+)/g, '<span class="text-purple-400 font-bold">$1</span>')
     // Selectors (Ids, Classes, Tags)
     .replace(/([^{}\n]+)\s*(?={)/g, (match) => {
+       // Avoid highlighting inside @media blocks incorrectly by checking indentation context roughly or just applying generally
        return match.replace(/(#[a-zA-Z0-9_-]+)/g, '<span class="text-amber-400 font-bold">$1</span>')
                    .replace(/(\.[a-zA-Z0-9_-]+)/g, '<span class="text-blue-400">$1</span>')
                    .replace(/\b(div|span|header|footer|main|section|article|nav|aside|button|input|a|p|h[1-6]|ul|li|ol|body|html)\b/g, '<span class="text-pink-400">$1</span>');
@@ -55,7 +58,7 @@ const highlightCSS = (code: string) => {
     // Values (Keywords, Numbers, Units, Strings)
     .replace(/:\s*([^;\}]+)/g, (match, val) => {
        const highlightedVal = val
-         .replace(/\b(important|auto|none|inherit|initial|revert|unset|absolute|relative|fixed|sticky|flex|grid|block|inline-block|inline)\b/g, '<span class="text-emerald-400 font-bold">$1</span>')
+         .replace(/\b(important|auto|none|inherit|initial|revert|unset|absolute|relative|fixed|sticky|flex|grid|block|inline-block|inline|center|hidden|visible)\b/g, '<span class="text-emerald-400 font-bold">$1</span>')
          .replace(/(-?\d*\.?\d+)(px|rem|em|vh|vw|%|s|ms|deg|fr)?/g, '<span class="text-sky-300 font-mono font-medium">$1$2</span>')
          .replace(/(['"][^'"]*['"])/g, '<span class="text-orange-300">$1</span>')
          .replace(/(hsl|rgb|rgba|var)\([^)]+\)/g, '<span class="text-rose-300">$0</span>');
@@ -68,7 +71,7 @@ const highlightCSS = (code: string) => {
 
 /**
  * PRODUCTION-GRADE INTERNAL CSS LINTER
- * Implements a subset of standard stylelint rules.
+ * Implements a subset of standard stylelint rules to ensure best practices.
  */
 const performCssAudit = (css: string): CssIssue[] => {
   const issues: CssIssue[] = [];
@@ -104,7 +107,7 @@ const performCssAudit = (css: string): CssIssue[] => {
       currentSelector = trimmedLine.split('{')[0].trim();
       
       // Rule: selector-no-redundant
-      if (seenSelectors.has(currentSelector)) {
+      if (seenSelectors.has(currentSelector) && !currentSelector.startsWith('@')) {
         issues.push({
           id: `redundant-selector-${lineNum}`,
           line: lineNum,
@@ -130,7 +133,7 @@ const performCssAudit = (css: string): CssIssue[] => {
     }
     
     // Rule: Property/Value Declarations
-    if (inBlock && trimmedLine.includes(':')) {
+    if (inBlock && trimmedLine.includes(':') && !trimmedLine.startsWith('//')) {
       blockHasContent = true;
       const parts = trimmedLine.split(':');
       const prop = parts[0].trim();
@@ -212,11 +215,23 @@ const performCssAudit = (css: string): CssIssue[] => {
               suggestion: `Use standard "${standardProp}" property as modern browsers handle it natively.`
           });
       }
+
+      // Rule: z-index scale limit
+      if (prop === 'z-index' && !isNaN(parseInt(val)) && parseInt(val) > 1000) {
+          issues.push({
+              id: `z-index-high-${lineNum}`,
+              line: lineNum,
+              message: `High z-index value (${val}).`,
+              type: 'warning',
+              code: 'scale-unlimited-z-index',
+              suggestion: 'Avoid excessive z-index values. Stick to a defined scale (e.g. 10, 20, 30, 40, 50) to manage stacking contexts.'
+          });
+      }
     }
 
     // Rule: Detect Block End
     if (trimmedLine.includes('}')) {
-      if (inBlock && !blockHasContent) {
+      if (inBlock && !blockHasContent && !currentSelector.startsWith('@')) {
         issues.push({
             id: `empty-block-${lineNum}`,
             line: lineNum,
@@ -354,14 +369,20 @@ export const CssEditorPanel: React.FC<CssEditorPanelProps> = ({ css, theme: prop
                 className="w-12 bg-[#0c0c0e] text-zinc-800 text-right pr-3 py-6 select-none border-r border-zinc-900/50 overflow-hidden leading-6 font-mono"
                 aria-hidden="true"
               >
-                {lineNumbers.map((num) => (
-                  <div 
-                    key={num} 
-                    className={`transition-colors duration-200 ${num === cursorLine ? 'text-zinc-400 font-bold' : 'text-zinc-800'}`}
-                  >
-                    {num}
-                  </div>
-                ))}
+                {lineNumbers.map((num) => {
+                  const lineIssue = issues.find(i => i.line === num);
+                  return (
+                    <div 
+                      key={num} 
+                      className={`relative transition-colors duration-200 flex justify-end ${num === cursorLine ? 'text-zinc-400 font-bold' : 'text-zinc-800'}`}
+                    >
+                      {num}
+                      {lineIssue && (
+                          <div className={`absolute -right-2 top-2 w-1.5 h-1.5 rounded-full ${lineIssue.type === 'error' ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="flex-1 relative overflow-hidden group">

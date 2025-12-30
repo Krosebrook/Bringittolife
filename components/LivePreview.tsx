@@ -20,6 +20,7 @@ import { DocumentationPanel } from './live/DocumentationPanel';
 import { CiCdPanel } from './live/CiCdPanel';
 import { useCreation } from '../hooks/useCreation';
 import { docsService } from '../services/docsService';
+import { geminiService } from '../services/gemini';
 
 interface LivePreviewProps {
   creation: Creation | null;
@@ -45,6 +46,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
     const [isLandscape, setIsLandscape] = useState(false);
     const [accessibilityIssues, setAccessibilityIssues] = useState<AccessibilityIssue[]>([]);
     const [isSyncingDocs, setIsSyncingDocs] = useState(false);
+    const [isSyncingPipeline, setIsSyncingPipeline] = useState(false);
 
     const { 
       activeCreation: internalCreation, 
@@ -79,6 +81,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       return () => window.removeEventListener('message', handleMessage);
     }, []);
 
+    // REFACTORED: CSS Extraction Logic
+    // Prioritizes extracted styles without restrictive @layer wrapping to ensure overrides work.
     useEffect(() => {
         if (creation) {
             const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
@@ -87,7 +91,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
             while ((match = styleRegex.exec(creation.html)) !== null) {
                 const styleContent = match[1].trim();
                 if (styleContent) {
-                  extractedCss += `/* Synthesized from Component Source */\n@layer utilities {\n${styleContent}\n}\n\n`;
+                  extractedCss += `/* Synthesized from Component Source */\n${styleContent}\n\n`;
                 }
             }
             if (extractedCss) {
@@ -104,7 +108,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
           iframeRef.current.contentWindow.postMessage({ type: 'update-css', css: customCss }, '*');
         }
       };
-      const timer = setTimeout(syncStyles, 16);
+      // Immediate sync for responsiveness
+      const timer = setTimeout(syncStyles, 0);
       return () => clearTimeout(timer);
     }, [customCss]);
 
@@ -136,14 +141,17 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       }
     };
 
-    const handleSuggestPipeline = () => {
+    const handleSuggestPipeline = async () => {
        if (!creation) return;
-       const suggested: any[] = [
-          { id: '1', name: 'Lint (Prettier)', type: 'lint', status: 'success' },
-          { id: '2', name: 'Build (Tailwind)', type: 'build', status: 'active' },
-          { id: '3', name: 'Vercel Deployment', type: 'deploy', status: 'pending' },
-       ];
-       setActiveCreation({ ...creation, pipeline: suggested });
+       setIsSyncingPipeline(true);
+       try {
+          const pipeline = await geminiService.suggestPipeline(creation.html);
+          setActiveCreation({ ...creation, pipeline });
+       } catch (err) {
+          console.error("Pipeline Sync Failed", err);
+       } finally {
+          setIsSyncingPipeline(false);
+       }
     };
 
     const handleCopyCode = async () => {
@@ -254,7 +262,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                     <CiCdPanel 
                       pipeline={creation.pipeline} 
                       onSuggest={handleSuggestPipeline} 
-                      isLoading={isLoading} 
+                      isLoading={isLoading || isSyncingPipeline} 
                     />
                   ) : null}
                 </aside>
